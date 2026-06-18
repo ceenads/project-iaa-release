@@ -1,0 +1,42 @@
+name: Publish Pages
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'project-iaa-platform/latest.html'
+      - '.github/workflows/publish-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Publish to gh-pages
+        run: |
+          set -euo pipefail
+          worktree="$(mktemp -d)"
+          git fetch origin gh-pages
+          git worktree add "$worktree" origin/gh-pages
+
+          mkdir -p "$worktree/project-iaa-platform"
+          cp project-iaa-platform/latest.html "$worktree/project-iaa-platform/latest.html"
+          touch "$worktree/.nojekyll"
+
+          cd "$worktree"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .nojekyll project-iaa-platform/latest.html
+          git commit -m "Publish project-iaa-platform deploy page" || exit 0
+          git push origin HEAD:gh-pages

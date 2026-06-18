@@ -1,0 +1,3175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IAA 配置与部署向导</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/jsoneditor@9.10.0/dist/jsoneditor.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        .container {
+            max-width: 1400px;
+        }
+        .wizard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        /* 选项卡样式 */
+        .wizard-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 3px solid #dee2e6;
+        }
+        .wizard-tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s;
+            border-right: 1px solid #dee2e6;
+        }
+        .wizard-tab:last-child {
+            border-right: none;
+        }
+        .wizard-tab .step-number {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            border-radius: 50%;
+            background: #6c757d;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .wizard-tab .step-title {
+            display: block;
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .wizard-tab.active {
+            background: white;
+            border-bottom: 3px solid #667eea;
+            margin-bottom: -3px;
+        }
+        .wizard-tab.active .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .wizard-tab.active .step-title {
+            color: #667eea;
+        }
+        .wizard-tab.completed .step-number {
+            background: #28a745;
+        }
+        .wizard-tab.completed .step-number::after {
+            content: '✓';
+        }
+
+        /* 内容区域 */
+        .wizard-content {
+            padding: 30px;
+            min-height: 400px;
+        }
+        .step-pane {
+            display: none;
+        }
+        .step-pane.active {
+            display: block;
+        }
+
+        /* 域名列表 */
+        .domain-list {
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .domain-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .domain-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        .domain-item.selected {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        .domain-item .domain-name {
+            font-weight: 600;
+            color: #495057;
+            font-size: 16px;
+        }
+        .domain-item .btn-delete-domain {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .domain-item .btn-delete-domain:hover {
+            background: #c82333;
+        }
+
+        /* 服务器行 */
+        .server-row {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            position: relative;
+        }
+        .artifact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 12px;
+            align-items: stretch;
+        }
+        .artifact-option {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 86px;
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+        }
+        .service-component-option {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 86px;
+            display: grid;
+            grid-template-columns: minmax(110px, 1fr) minmax(150px, 170px);
+            gap: 12px;
+            align-items: end;
+        }
+        .service-component-check {
+            display: flex;
+            align-items: center;
+            min-height: 38px;
+            font-weight: 600;
+        }
+        .service-component-version label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+        .service-component-version {
+            min-width: 150px;
+        }
+        .service-component-version .form-control {
+            min-height: 38px;
+        }
+        .deploy-repo-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .deploy-repo-card {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .deploy-repo-title {
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .deploy-repo-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 96px;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+        .deploy-repo-meta {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+        }
+        .deploy-repo-action .btn {
+            min-height: 38px;
+        }
+        .deploy-inner-layout {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr);
+            gap: 20px;
+            align-items: stretch;
+            height: 100%;
+            min-height: 0;
+        }
+        .deploy-inner-tabs {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            position: sticky;
+            top: 0;
+        }
+        .deploy-inner-tab {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: #495057;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+            text-align: left;
+        }
+        .deploy-inner-tab:hover {
+            background: #e9ecef;
+        }
+        .deploy-inner-tab.active {
+            background: #0d6efd;
+            color: #fff;
+        }
+        .deploy-inner-content {
+            min-width: 0;
+            min-height: 0;
+            overflow-y: auto;
+            padding-bottom: 20px;
+        }
+        .deploy-workspace .editor-scroll {
+            background: transparent;
+        }
+        .deploy-subpane {
+            display: none;
+        }
+        .deploy-subpane.active {
+            display: block;
+        }
+        #deploySubPaneRun.active {
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+        #deployResultLog {
+            flex: 1;
+            max-height: none !important;
+        }
+        @media (max-width: 520px) {
+            .service-component-option {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 900px) {
+            .deploy-repo-list,
+            .deploy-inner-layout {
+                grid-template-columns: 1fr;
+            }
+            .deploy-inner-tabs {
+                position: static;
+            }
+        }
+        @media (max-width: 520px) {
+            .deploy-repo-main,
+            .deploy-repo-meta {
+                grid-template-columns: 1fr;
+            }
+        }
+        .server-row .btn-delete-row {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .server-row .btn-delete-row:hover {
+            background: #c82333;
+        }
+
+        /* 导航按钮 */
+        .wizard-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #dee2e6;
+        }
+
+        .section-title {
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 20px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        textarea.form-control {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .new-domain-input {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+
+        /* JSON 编辑器样式 */
+        #jsoneditor, #previewEditor {
+            height: 500px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+
+        /* 服务器选项卡样式 */
+        .server-tabs {
+            position: sticky;
+            top: 20px;
+        }
+
+        .server-tabs .nav-link {
+            text-align: left;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            color: #495057;
+        }
+
+        .server-tabs .nav-link:hover {
+            background-color: #e9ecef;
+        }
+
+        .server-tabs .nav-link.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+
+        /* 验证错误样式 */
+        .is-invalid {
+            border-color: #dc3545 !important;
+        }
+
+        .invalid-feedback {
+            display: none;
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .is-invalid ~ .invalid-feedback,
+        .input-group .is-invalid ~ .invalid-feedback {
+            display: block;
+        }
+
+        /* 端口放行提醒面板 */
+        .port-reminder-panel {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .port-reminder-panel .panel-header {
+            padding: 15px 20px;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .port-reminder-panel .panel-header:hover {
+            background: rgba(255, 193, 7, 0.1);
+        }
+
+        .port-reminder-panel h5 {
+            color: #856404;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .port-reminder-panel .toggle-icon {
+            color: #856404;
+            font-size: 20px;
+            transition: transform 0.3s;
+        }
+
+        .port-reminder-panel .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .port-reminder-panel .panel-content {
+            padding: 0 20px 20px 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+
+        .port-reminder-panel .panel-content.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            overflow: hidden;
+        }
+
+        .port-reminder-panel .server-port-info {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ffc107;
+        }
+
+        .port-reminder-panel .server-port-info:last-child {
+            margin-bottom: 0;
+        }
+
+        .port-reminder-panel .server-name {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+
+        .port-reminder-panel .server-ip {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .port-reminder-panel .port-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .port-reminder-panel .port-badge {
+            background: #0d6efd;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* 域名解析提醒面板 */
+        .dns-reminder-panel {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            font-size: 15px;
+            color: #0c5460;
+        }
+
+        .dns-reminder-panel .dns-domain {
+            font-weight: 600;
+            color: #0c5460;
+        }
+
+        .dns-reminder-panel .dns-ip {
+            font-weight: 600;
+            color: #17a2b8;
+        }
+
+        html, body {
+            height: 100%;
+        }
+        body {
+            background: #f4f6f8;
+            padding: 0;
+            overflow: hidden;
+        }
+        .app-shell {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #f4f6f8;
+        }
+        .top-tabs {
+            height: 56px;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            background: #ffffff;
+            border-bottom: 1px solid #d8dee7;
+            padding: 0 18px;
+            gap: 6px;
+        }
+        .app-tab {
+            border: 0;
+            background: transparent;
+            padding: 0 26px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #576273;
+            border-bottom: 3px solid transparent;
+        }
+        .app-tab.active {
+            color: #0d6efd;
+            border-bottom-color: #0d6efd;
+        }
+        .app-main {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .main-view {
+            display: none;
+            height: 100%;
+            min-height: 0;
+        }
+        .main-view.active {
+            display: flex;
+        }
+        #configView {
+            flex-direction: row;
+        }
+        #deployView {
+            flex-direction: row;
+            overflow: hidden;
+        }
+        .domain-sidebar {
+            width: 320px;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #d8dee7;
+            background: #ffffff;
+            padding: 18px;
+            gap: 14px;
+        }
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #243041;
+        }
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: #7b8794;
+            margin-top: 2px;
+        }
+        .domain-add-row {
+            flex-shrink: 0;
+        }
+        .domain-sidebar .domain-list {
+            flex: 1;
+            max-height: none;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .config-workspace {
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+            padding: 18px;
+        }
+        .domain-editor {
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #d8dee7;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+        }
+        .editor-kicker {
+            font-size: 12px;
+            color: #7b8794;
+        }
+        .editor-domain {
+            font-size: 20px;
+            line-height: 1.2;
+            font-weight: 800;
+            color: #1f2937;
+        }
+        .editor-status {
+            font-size: 12px;
+            color: #198754;
+        }
+        .editor-body {
+            flex: 1;
+            min-height: 0;
+        }
+        .editor-body > [class*="col-"] {
+            min-height: 0;
+        }
+        .editor-scroll {
+            height: 100%;
+            overflow-y: auto;
+            padding-bottom: 20px;
+        }
+        .server-tabs {
+            position: sticky;
+            top: 0;
+        }
+        .deploy-panel {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 18px;
+        }
+        .deploy-panel > .section-title {
+            flex-shrink: 0;
+        }
+        .deploy-panel > .server-row {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .action-bar {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 0 18px;
+            background: #ffffff;
+            border-top: 1px solid #d8dee7;
+        }
+        .action-right {
+            display: flex;
+            gap: 10px;
+        }
+        .empty-state {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #6b7280;
+        }
+        .empty-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #243041;
+            margin-bottom: 8px;
+        }
+        .empty-text {
+            max-width: 520px;
+        }
+        .load-panel {
+            width: min(1280px, 100%);
+            height: 100%;
+            margin: 0 auto;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .load-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            background: #ffffff;
+            border: 1px solid #d8dee7;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+        }
+        .load-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #243041;
+        }
+        .load-subtitle {
+            font-size: 13px;
+            color: #7b8794;
+            margin-top: 3px;
+        }
+        #jsoneditor {
+            flex: 1;
+            min-height: 0;
+            height: auto;
+            background: #ffffff;
+        }
+        .hidden-editor {
+            position: absolute;
+            left: -99999px;
+            top: -99999px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+<div class="app-shell">
+    <div class="top-tabs">
+        <button type="button" class="app-tab active" id="loadTabBtn" onclick="showMainTab('load')">加载</button>
+        <button type="button" class="app-tab" id="configTabBtn" onclick="showMainTab('config')">配置</button>
+        <button type="button" class="app-tab" id="deployTabBtn" onclick="showMainTab('deploy')">部署</button>
+    </div>
+
+    <input type="file" id="configFile" accept=".json,application/json" style="display: none;" onchange="loadConfigFromFile()">
+    <div id="previewEditor" class="hidden-editor"></div>
+
+    <main class="app-main">
+        <section class="main-view active" id="loadView">
+            <div class="load-panel">
+                <div class="load-header">
+                    <div>
+                        <div class="load-title">加载配置</div>
+                        <div class="load-subtitle">上传或直接编辑 IAA JSON，切到配置页后会按 web 域名生成左侧列表。</div>
+                    </div>
+                </div>
+                <div id="jsoneditor"></div>
+            </div>
+        </section>
+
+        <section class="main-view" id="configView">
+            <aside class="domain-sidebar">
+                <div class="sidebar-header">
+                    <div>
+                        <div class="sidebar-title">域名列表</div>
+                        <div class="sidebar-subtitle">选择、追加或删除部署节点</div>
+                    </div>
+                </div>
+
+                <div class="input-group domain-add-row">
+                    <input type="text" class="form-control new-domain-input" id="newDomainInput" placeholder="task.ceenads.com">
+                    <button class="btn btn-primary" type="button" onclick="addNewDomain()">新增</button>
+                </div>
+
+                <div class="domain-list" id="domainList"></div>
+            </aside>
+
+            <section class="config-workspace">
+                <div class="empty-state" id="noDomainState">
+                    <div class="empty-title">请选择或新增一个域名</div>
+                    <div class="empty-text">读取本地 JSON 后会在左侧显示已有域名，选中后可直接修改服务器、数据库、Redis 和 Nginx 配置。</div>
+                </div>
+
+                <div class="domain-editor" id="domainEditor" style="display: none;">
+                    <div class="editor-header" id="currentDomainAlert">
+                        <div>
+                            <div class="editor-kicker">当前域名</div>
+                            <div class="editor-domain" id="currentDomainName"></div>
+                        </div>
+                        <div class="editor-status" id="autosaveStatus">已保存到当前配置</div>
+                    </div>
+
+                    <div class="row editor-body">
+                        <div class="col-md-3">
+                            <div class="nav flex-column nav-pills server-tabs" id="serverTabs" role="tablist">
+                                <button class="nav-link active" id="params-tab" data-bs-toggle="pill" data-bs-target="#params" type="button" role="tab">⚙️ 参数设置</button>
+                                <button class="nav-link" id="busDb-tab" data-bs-toggle="pill" data-bs-target="#busDb" type="button" role="tab">🗄️ 业务数据库</button>
+                                <button class="nav-link" id="riskDb-tab" data-bs-toggle="pill" data-bs-target="#riskDb" type="button" role="tab">🗄️ 风控数据库</button>
+                                <button class="nav-link" id="gateway-tab" data-bs-toggle="pill" data-bs-target="#gateway" type="button" role="tab">🌐 网关服务器</button>
+                                <button class="nav-link" id="service-tab" data-bs-toggle="pill" data-bs-target="#service" type="button" role="tab">🖥️ 负载服务器</button>
+                                <button class="nav-link" id="redis-tab" data-bs-toggle="pill" data-bs-target="#redis" type="button" role="tab">💾 缓存服务器</button>
+                                <button class="nav-link" id="info-tab" data-bs-toggle="pill" data-bs-target="#info" type="button" role="tab" onclick="refreshInfoPanel()">⚠️ 域名防火墙</button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-9 editor-scroll">
+                            <div class="tab-content" id="serverTabContent">
+                                <div class="tab-pane fade show active" id="params" role="tabpanel"><div id="paramsContent"></div></div>
+                                <div class="tab-pane fade" id="busDb" role="tabpanel"><div id="busDbContent"></div></div>
+                                <div class="tab-pane fade" id="riskDb" role="tabpanel"><div id="riskDbContent"></div></div>
+                                <div class="tab-pane fade" id="gateway" role="tabpanel"><div id="gatewayContent"></div></div>
+                                <div class="tab-pane fade" id="service" role="tabpanel"><div id="serviceContent"></div></div>
+                                <div class="tab-pane fade" id="redis" role="tabpanel"><div id="redisContent"></div></div>
+                                <div class="tab-pane fade" id="info" role="tabpanel">
+                                    <div class="dns-reminder-panel" id="dnsReminderPanel">🌐 <span id="dnsReminderContent"></span></div>
+                                    <div class="port-reminder-panel" id="portReminderPanel">
+                                        <div class="panel-header">
+                                            <h5><span>⚠️</span><span>服务器端口放行提醒</span></h5>
+                                        </div>
+                                        <div class="panel-content" id="portReminderContent"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <section class="main-view" id="deployView">
+            <aside class="domain-sidebar deploy-sidebar">
+                <div class="sidebar-header">
+                    <div>
+                        <div class="sidebar-title">部署执行</div>
+                        <div class="sidebar-subtitle">配置参数并执行部署</div>
+                    </div>
+                </div>
+                <div class="deploy-inner-tabs" role="tablist" aria-label="部署步骤">
+                    <button type="button" class="deploy-inner-tab active" id="deploySubTabParams" onclick="showDeploySubTab('params')">参数</button>
+                    <button type="button" class="deploy-inner-tab" id="deploySubTabRun" onclick="showDeploySubTab('run')">执行</button>
+                </div>
+            </aside>
+
+            <section class="config-workspace deploy-workspace">
+                <div class="domain-editor">
+                    <div class="editor-scroll">
+                    <div class="deploy-subpane active" id="deploySubPaneParams">
+                        <div class="section-title">配置</div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">部署域名</label>
+                                <select class="form-select" id="deployTargetDomain">
+                                    <option value="all">全部域名</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">GitHub Token</label>
+                                <input type="password" class="form-control" id="deployGithubToken" autocomplete="off" placeholder="需要 actions:write / workflow dispatch 权限，会保存到本地 JSON 的 setup 节点">
+                            </div>
+                        </div>
+                        <div class="deploy-repo-list">
+                            <div class="deploy-repo-card">
+                                <div class="deploy-repo-title">Platform</div>
+                                <div class="deploy-repo-main">
+                                    <div>
+                                        <label class="form-label">仓库</label>
+                                        <input type="text" class="form-control" id="deployPlatformRepository" value="__REPOSITORY__" placeholder="ceenads/project-iaa-platform">
+                                    </div>
+                                    <div class="deploy-repo-action">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="button" class="btn btn-outline-secondary w-100" onclick="openPlatformDeployActions()">Actions</button>
+                                    </div>
+                                </div>
+                                <div class="deploy-repo-meta">
+                                    <div>
+                                        <label class="form-label">分支</label>
+                                        <input type="text" class="form-control" id="deployPlatformWorkflowRef" value="master">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Release Tag</label>
+                                        <input type="text" class="form-control" id="deployPlatformReleaseTag" value="__RELEASE_TAG__" placeholder="latest">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="deploy-repo-card">
+                                <div class="deploy-repo-title">Service</div>
+                                <div class="deploy-repo-main">
+                                    <div>
+                                        <label class="form-label">仓库</label>
+                                        <input type="text" class="form-control" id="deployServiceRepository" value="ceenads/project-iaa-service" placeholder="ceenads/project-iaa-service">
+                                    </div>
+                                    <div class="deploy-repo-action">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="button" class="btn btn-outline-secondary w-100" onclick="openProducerDeployActions()">Actions</button>
+                                    </div>
+                                </div>
+                                <div class="deploy-repo-meta">
+                                    <div>
+                                        <label class="form-label">分支</label>
+                                        <input type="text" class="form-control" id="deployServiceWorkflowRef" value="master">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Release Tag</label>
+                                        <input type="text" class="form-control" id="deployServiceReleaseTag" value="latest" placeholder="latest">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-title">组件</div>
+                        <div class="artifact-grid mb-3">
+                            <div class="service-component-option">
+                                <label class="service-component-check"><input class="form-check-input me-2 deploy-component" type="checkbox" value="redis" checked> Redis</label>
+                                <div class="service-component-version">
+                                    <label class="form-label" for="deployRedisVersion">镜像版本</label>
+                                    <input type="text" class="form-control" id="deployRedisVersion" value="7.2-alpine">
+                                </div>
+                            </div>
+                            <div class="service-component-option">
+                                <label class="service-component-check"><input class="form-check-input me-2 deploy-component" type="checkbox" value="nginx" checked> Nginx</label>
+                                <div class="service-component-version">
+                                    <label class="form-label" for="deployNginxVersion">镜像版本</label>
+                                    <input type="text" class="form-control" id="deployNginxVersion" value="1.27.3">
+                                </div>
+                            </div>
+                            <label class="artifact-option"><input class="form-check-input me-2 deploy-component" type="checkbox" value="bus-java" checked> 业务后端</label>
+                            <label class="artifact-option"><input class="form-check-input me-2 deploy-component" type="checkbox" value="risk-java" checked> 风控后端</label>
+                            <label class="artifact-option"><input class="form-check-input me-2 deploy-component" type="checkbox" value="bus-web" checked> 业务前端</label>
+                            <label class="artifact-option"><input class="form-check-input me-2 deploy-component" type="checkbox" value="risk-web" checked> 风控前端</label>
+                            <label class="artifact-option"><input class="form-check-input me-2 deploy-component" type="checkbox" value="producer" checked> 服务组件</label>
+                        </div>
+                    </div>
+
+                    <div class="deploy-subpane" id="deploySubPaneRun">
+                        <div class="section-title">执行</div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">Commit: <code>__COMMIT__</code></div>
+                            <div>
+                                <button type="button" class="btn btn-primary" onclick="triggerDeployFromPreview()">开始部署</button>
+                            </div>
+                        </div>
+                        <pre id="deployResultLog" class="mt-3 mb-0 text-muted" style="min-height: 220px; max-height: 520px; overflow: auto; white-space: pre-wrap;">等待部署...</pre>
+                    </div>
+                    </div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <footer class="action-bar">
+        <button class="btn btn-outline-secondary" id="btnLoadFile" onclick="document.getElementById('configFile').click()">📁 读取本地文件</button>
+        <div class="action-right">
+            <button class="btn btn-success" id="btnDownload" onclick="downloadConfig()">💾 保存到本地</button>
+        </div>
+    </footer>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsoneditor@9.10.0/dist/jsoneditor.min.js"></script>
+<script>
+    // 全局变量
+    let currentConfig = null;
+    let currentStep = 1;
+    let activeMainTab = 'load';
+    let selectedDomain = null;
+    let isNewDomain = false;
+    let serviceServerCount = 0;
+    let redisServerCount = 0;
+    let operationMode = null; // 'new', 'edit', 'delete'
+    let editor = null; // JSON 编辑器实例
+    let previewEditor = null; // 预览编辑器实例
+
+    // 切换密码显示/隐藏
+    function togglePassword(button, show) {
+        const input = button.previousElementSibling;
+        if (show) {
+            input.type = 'text';
+        } else {
+            input.type = 'password';
+        }
+    }
+
+    function showMainTab(tab) {
+        if (activeMainTab === 'config' && tab !== 'config' && !saveCurrentDomainDraft(false)) {
+            return;
+        }
+        if ((tab === 'config' || tab === 'deploy') && !syncEditorConfig()) {
+            return;
+        }
+        if (tab === 'deploy') {
+            generatePreview();
+        }
+
+        ['load', 'config', 'deploy'].forEach(name => {
+            document.getElementById(name + 'View').classList.toggle('active', name === tab);
+            document.getElementById(name + 'TabBtn').classList.toggle('active', name === tab);
+        });
+        activeMainTab = tab;
+
+        if (tab === 'load' && editor?.refresh) {
+            setTimeout(() => editor.refresh(), 0);
+        }
+        if (tab === 'config') {
+            populateDomainList();
+        }
+    }
+
+    function showDeploySubTab(tab) {
+        const tabs = {
+            params: ['deploySubTabParams', 'deploySubPaneParams'],
+            run: ['deploySubTabRun', 'deploySubPaneRun']
+        };
+        Object.entries(tabs).forEach(([name, ids]) => {
+            const active = name === tab;
+            document.getElementById(ids[0])?.classList.toggle('active', active);
+            document.getElementById(ids[1])?.classList.toggle('active', active);
+        });
+    }
+
+    function refreshInfoPanel() {
+        saveCurrentDomainDraft(false);
+        generatePreview();
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"]/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;'
+        }[char]));
+    }
+
+    function syncEditorConfig() {
+        try {
+            const config = editor.get();
+            currentConfig = config || { web: [] };
+            if (!Array.isArray(currentConfig.web)) {
+                currentConfig.web = [];
+            }
+            return true;
+        } catch (err) {
+            alert('❌ 配置格式错误：' + err.message);
+            ['load', 'config', 'deploy'].forEach(name => {
+                document.getElementById(name + 'View').classList.toggle('active', name === 'load');
+                document.getElementById(name + 'TabBtn').classList.toggle('active', name === 'load');
+            });
+            if (editor?.refresh) {
+                setTimeout(() => editor.refresh(), 0);
+            }
+            return false;
+        }
+    }
+
+    function updateEditorConfig() {
+        if (editor && currentConfig) {
+            editor.set(currentConfig);
+        }
+        if (previewEditor && currentConfig) {
+            previewEditor.set(currentConfig);
+        }
+    }
+
+    function showDomainEditor() {
+        document.getElementById('noDomainState').style.display = 'none';
+        document.getElementById('domainEditor').style.display = 'flex';
+    }
+
+    function hideDomainEditor() {
+        document.getElementById('noDomainState').style.display = 'flex';
+        document.getElementById('domainEditor').style.display = 'none';
+    }
+
+    function saveCurrentDomainDraft(strict = false) {
+        if (!selectedDomain || !document.getElementById('paramsContent')?.children.length) {
+            return true;
+        }
+        const ok = generateConfigFromForm({ strict });
+        if (ok) {
+            updateEditorConfig();
+            const status = document.getElementById('autosaveStatus');
+            if (status) {
+                status.textContent = '已保存到当前配置 ' + new Date().toLocaleTimeString();
+            }
+        }
+        return ok;
+    }
+
+    function bindAutosaveHandlers() {
+        const editorEl = document.getElementById('domainEditor');
+        if (!editorEl || editorEl.dataset.autosaveBound === 'true') {
+            return;
+        }
+        let timer = null;
+        const queueSave = () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => saveCurrentDomainDraft(false), 350);
+        };
+        editorEl.addEventListener('input', queueSave);
+        editorEl.addEventListener('change', queueSave);
+        editorEl.dataset.autosaveBound = 'true';
+    }
+
+    // 从文件加载配置
+    function loadConfigFromFile() {
+        const fileInput = document.getElementById('configFile');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const json = JSON.parse(e.target.result);
+                editor.set(json);
+                if (syncEditorConfig()) {
+                    selectedDomain = null;
+                    hideDomainEditor();
+                    populateDomainList();
+                    applyDeploySetup();
+                    showMainTab('config');
+                }
+            } catch (err) {
+                alert('❌ 读取文件失败：' + err.message);
+            } finally {
+                fileInput.value = '';
+            }
+        };
+        reader.onerror = function() {
+            alert('❌ 读取文件失败！');
+        };
+        reader.readAsText(file);
+    }
+
+    // 加载配置（内部函数）
+    function loadConfig() {
+        return syncEditorConfig();
+    }
+
+    // 填充域名列表
+    function populateDomainList() {
+        if (!currentConfig && !syncEditorConfig()) {
+            return;
+        }
+
+        const domainList = document.getElementById('domainList');
+        domainList.innerHTML = '';
+
+        const domains = (currentConfig.web || []).map(item => item.domain).filter(Boolean);
+        if (selectedDomain && !domains.includes(selectedDomain)) {
+            domains.push(selectedDomain);
+        }
+
+        if (domains.length === 0) {
+            domainList.innerHTML = '<div class="alert alert-warning">暂无域名配置</div>';
+            return;
+        }
+
+        domains.forEach(domain => {
+            const item = document.createElement('div');
+            item.className = 'domain-item' + (domain === selectedDomain ? ' selected' : '');
+            item.innerHTML = `
+                    <span class="domain-name">${escapeHtml(domain)}</span>
+                    <button class="btn-delete-domain" type="button" title="删除此域名">✕</button>
+                `;
+            item.addEventListener('click', () => selectDomainItem(domain, item));
+            item.querySelector('.btn-delete-domain').addEventListener('click', event => deleteDomainItem(domain, event));
+            domainList.appendChild(item);
+        });
+    }
+
+    // 新增域名
+    function addNewDomain() {
+        if (!saveCurrentDomainDraft(false)) {
+            return;
+        }
+        if (!syncEditorConfig()) {
+            return;
+        }
+
+        const newDomain = document.getElementById('newDomainInput').value.trim();
+        if (!newDomain) {
+            alert('❌ 请输入域名！');
+            return;
+        }
+        if (!validateDomain(newDomain)) {
+            alert('❌ 请输入有效的域名格式！');
+            return;
+        }
+        if (currentConfig.web.find(w => w.domain === newDomain)) {
+            alert('❌ 该域名已存在，请直接从列表中选择！');
+            return;
+        }
+
+        selectedDomain = newDomain;
+        operationMode = 'new';
+        isNewDomain = true;
+        document.getElementById('newDomainInput').value = '';
+        showDomainEditor();
+        loadServerConfigForm();
+        populateDomainList();
+    }
+
+    // 选择域名项
+    function selectDomainItem(domain) {
+        if (domain === selectedDomain) {
+            populateDomainList();
+            return;
+        }
+        if (!saveCurrentDomainDraft(false)) {
+            return;
+        }
+        if (!syncEditorConfig()) {
+            return;
+        }
+
+        selectedDomain = domain;
+        operationMode = 'edit';
+        isNewDomain = false;
+        document.getElementById('newDomainInput').value = '';
+        showDomainEditor();
+        loadServerConfigForm();
+        populateDomainList();
+    }
+
+    // 删除域名项
+    function deleteDomainItem(domain, event) {
+        event.stopPropagation();
+        if (!confirm(`⚠️ 确定要删除域名 "${domain}" 吗？`)) {
+            return;
+        }
+        if (!syncEditorConfig()) {
+            return;
+        }
+
+        currentConfig.web = currentConfig.web.filter(w => w.domain !== domain);
+        if (selectedDomain === domain) {
+            selectedDomain = null;
+            operationMode = null;
+            isNewDomain = false;
+            hideDomainEditor();
+        }
+        updateEditorConfig();
+        populateDomainList();
+        generatePreview();
+    }
+
+    // ========== 验证函数 ==========
+
+    // 验证IP地址格式
+    function validateIP(ip) {
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (!ipPattern.test(ip)) return false;
+        const parts = ip.split('.');
+        return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
+    }
+
+    // 验证端口号格式
+    function validatePort(port) {
+        const portNum = parseInt(port);
+        return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
+    }
+
+    // 验证 Redis 库序
+    function validateRedisRank(rank) {
+        const rankNum = parseInt(rank);
+        return !isNaN(rankNum) && rankNum >= 0 && rankNum <= 15;
+    }
+
+    // 验证域名格式
+    function validateDomain(domain) {
+        const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        return domainPattern.test(domain);
+    }
+
+    // 为输入框添加验证
+    function addValidation(inputId, validationType, errorMessage) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        // 移除已存在的错误提示
+        const existingFeedback = input.parentElement.querySelector('.invalid-feedback');
+        if (existingFeedback) {
+            existingFeedback.remove();
+        }
+
+        // 添加错误提示元素
+        const feedback = document.createElement('div');
+        feedback.className = 'invalid-feedback';
+        feedback.textContent = errorMessage;
+
+        if (input.parentElement.classList.contains('input-group')) {
+            input.parentElement.parentElement.appendChild(feedback);
+        } else {
+            input.parentElement.appendChild(feedback);
+        }
+
+        // 失去焦点时验证
+        input.addEventListener('blur', function() {
+            validateField(inputId, validationType, errorMessage);
+        });
+
+        // 输入时清除错误状态
+        input.addEventListener('input', function() {
+            input.classList.remove('is-invalid');
+        });
+    }
+
+    // 验证单个字段
+    function validateField(inputId, validationType, errorMessage) {
+        const input = document.getElementById(inputId);
+        if (!input) return true;
+
+        const value = input.value.trim();
+        let isValid = true;
+
+        if (validationType === 'required') {
+            isValid = value !== '';
+        } else if (validationType === 'ip') {
+            isValid = value === '' || validateIP(value);
+        } else if (validationType === 'port') {
+            isValid = value === '' || validatePort(value);
+        } else if (validationType === 'redisRank') {
+            isValid = value === '' || validateRedisRank(value);
+        } else if (validationType === 'domain') {
+            isValid = value === '' || validateDomain(value);
+        }
+
+        if (!isValid) {
+            input.classList.add('is-invalid');
+        } else {
+            input.classList.remove('is-invalid');
+        }
+
+        return isValid;
+    }
+
+    // 检查同类型服务器是否重复
+    function checkDuplicateServer(serverType, currentId, host, comm) {
+        const container = serverType === 'service' ?
+            document.getElementById('serviceServers') :
+            document.getElementById('redisServers');
+
+        if (!container) return false;
+
+        const servers = container.querySelectorAll('.server-row');
+        for (let server of servers) {
+            if (server.id === currentId) continue; // 跳过当前服务器
+
+            // 从 serviceServer_0 或 redisServer_0 中提取 service_0 或 redis_0
+            const serverId = server.id.replace('serviceServer_', 'service_').replace('redisServer_', 'redis_');
+            const existingHost = document.getElementById(`${serverId}_host`)?.value.trim();
+            const existingComm = document.getElementById(`${serverId}_comm`)?.value.trim();
+
+            // 如果公网地址或内网地址有任一相同，则认为重复
+            if ((host && host === existingHost) || (comm && comm === existingComm)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 验证所有必填字段
+    function validateAllFields() {
+        let isValid = true;
+        const invalidFields = [];
+
+        // 验证参数设置
+        const paramsFields = [
+            'share_username', 'share_password',
+            'bus_admin_user', 'bus_admin_pass',
+            'risk_admin_user', 'risk_admin_pass',
+            'bus_web_path', 'bus_web_port',
+            'risk_web_path', 'risk_web_port'
+        ];
+
+        paramsFields.forEach(fieldId => {
+            const input = document.getElementById(fieldId);
+            if (input && !input.value.trim()) {
+                input.classList.add('is-invalid');
+                isValid = false;
+                invalidFields.push(fieldId);
+            }
+        });
+
+        // 验证数据库服务器
+        ['busDb', 'riskDb'].forEach(prefix => {
+            ['host', 'comm', 'port', 'user', 'pass', 'dbPort', 'dbUser', 'dbPass'].forEach(field => {
+                const input = document.getElementById(`${prefix}_${field}`);
+                if (input && !input.value.trim()) {
+                    input.classList.add('is-invalid');
+                    isValid = false;
+                    invalidFields.push(`${prefix}_${field}`);
+                }
+            });
+        });
+
+        // 验证网关服务器
+        ['host', 'comm', 'port', 'user', 'pass'].forEach(field => {
+            const input = document.getElementById(`gateway_${field}`);
+            if (input && !input.value.trim()) {
+                input.classList.add('is-invalid');
+                isValid = false;
+                invalidFields.push(`gateway_${field}`);
+            }
+        });
+
+        // 验证负载服务器
+        const serviceServers = document.getElementById('serviceServers')?.querySelectorAll('.server-row');
+        if (serviceServers) {
+            serviceServers.forEach(server => {
+                const id = server.id.replace('serviceServer_', '');
+                ['host', 'comm', 'port', 'user', 'pass'].forEach(field => {
+                    const input = document.getElementById(`service_${id}_${field}`);
+                    if (input && !input.value.trim()) {
+                        input.classList.add('is-invalid');
+                        isValid = false;
+                        invalidFields.push(`service_${id}_${field}`);
+                    }
+                });
+            });
+        }
+
+        // 验证缓存服务器
+        if (!document.getElementById('redisPort')?.value.trim() ||
+            !document.getElementById('redisRank')?.value.trim() ||
+            !document.getElementById('redisPassword')?.value.trim()) {
+            isValid = false;
+        }
+
+        const redisServers = document.getElementById('redisServers')?.querySelectorAll('.server-row');
+        if (redisServers) {
+            redisServers.forEach(server => {
+                const id = server.id.replace('redisServer_', '');
+                ['host', 'comm', 'port', 'user', 'pass'].forEach(field => {
+                    const input = document.getElementById(`redis_${id}_${field}`);
+                    if (input && !input.value.trim()) {
+                        input.classList.add('is-invalid');
+                        isValid = false;
+                        invalidFields.push(`redis_${id}_${field}`);
+                    }
+                });
+            });
+        }
+
+        if (!isValid) {
+            alert('❌ 请填写所有必填字段！');
+        }
+
+        return isValid;
+    }
+
+    // 加载服务器配置表单
+    function loadServerConfigForm() {
+        document.getElementById('currentDomainName').textContent = selectedDomain;
+        document.querySelectorAll('#serverTabs .nav-link').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('#serverTabContent .tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
+        document.getElementById('params-tab').classList.add('active');
+        document.getElementById('params').classList.add('show', 'active');
+
+        // 参数设置
+        document.getElementById('paramsContent').innerHTML = `
+                <div class="server-row">
+                    <h6 class="mb-3" style="color: #0d6efd; font-weight: 600;">🔧 网络共享凭据</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">共享用户名</label>
+                            <input type="text" class="form-control" id="share_username" value="ceenads" placeholder="ceenads">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">共享密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="share_password">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="mb-3 mt-4" style="color: #0d6efd; font-weight: 600;">👤 管理员账号</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">业务系统管理员用户名</label>
+                            <input type="text" class="form-control" id="bus_admin_user" value="admin">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">业务系统管理员密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="bus_admin_pass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">风控系统管理员用户名</label>
+                            <input type="text" class="form-control" id="risk_admin_user" value="admin">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">风控系统管理员密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="risk_admin_pass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="mb-3 mt-4" style="color: #0d6efd; font-weight: 600;">🌐 Web 服务配置</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">业务系统路径</label>
+                            <input type="text" class="form-control" id="bus_web_path" value="/bus" placeholder="/bus">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">业务系统端口</label>
+                            <input type="text" class="form-control" id="bus_web_port" value="8010" placeholder="8010">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">风控系统路径</label>
+                            <input type="text" class="form-control" id="risk_web_path" value="/risk" placeholder="/risk">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">风控系统端口</label>
+                            <input type="text" class="form-control" id="risk_web_port" value="8020" placeholder="8020">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        // 业务数据库
+        document.getElementById('busDbContent').innerHTML = `
+                <div class="server-row">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">公网地址</label>
+                            <input type="text" class="form-control" id="busDb_host" placeholder="47.79.255.xxx">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">内网地址</label>
+                            <input type="text" class="form-control" id="busDb_comm" placeholder="172.19.55.xxx">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">SSH端口</label>
+                            <input type="text" class="form-control" id="busDb_port" value="22">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SSH用户名</label>
+                            <input type="text" class="form-control" id="busDb_user" value="root">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SSH密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="busDb_pass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">数据库端口</label>
+                            <input type="text" class="form-control" id="busDb_dbPort" value="13367">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">数据库用户名</label>
+                            <input type="text" class="form-control" id="busDb_dbUser" value="root">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">数据库密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="busDb_dbPass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 text-end">
+                            <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('busDb', true)">🔌 测试连接</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        // 风控数据库
+        document.getElementById('riskDbContent').innerHTML = `
+                <div class="server-row">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">公网地址</label>
+                            <input type="text" class="form-control" id="riskDb_host" placeholder="47.79.255.xxx">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">内网地址</label>
+                            <input type="text" class="form-control" id="riskDb_comm" placeholder="172.19.55.xxx">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">SSH端口</label>
+                            <input type="text" class="form-control" id="riskDb_port" value="22">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SSH用户名</label>
+                            <input type="text" class="form-control" id="riskDb_user" value="root">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SSH密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="riskDb_pass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">数据库端口</label>
+                            <input type="text" class="form-control" id="riskDb_dbPort" value="13368">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">数据库用户名</label>
+                            <input type="text" class="form-control" id="riskDb_dbUser" value="root">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">数据库密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="riskDb_dbPass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 text-end">
+                            <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('riskDb', true)">🔌 测试连接</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        // 网关服务器
+        document.getElementById('gatewayContent').innerHTML = `
+                <div class="server-row">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">公网地址</label>
+                            <input type="text" class="form-control" id="gateway_host" placeholder="47.79.255.xxx">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">内网地址</label>
+                            <input type="text" class="form-control" id="gateway_comm" placeholder="172.19.55.xxx">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">SSH端口</label>
+                            <input type="text" class="form-control" id="gateway_port" value="22">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SSH用户名</label>
+                            <input type="text" class="form-control" id="gateway_user" value="root">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SSH密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="gateway_pass">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 text-end">
+                            <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('gateway', false)">🔌 测试连接</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        // 负载服务器
+        document.getElementById('serviceContent').innerHTML = `
+                <div id="serviceServers"></div>
+                <div class="text-end mt-3">
+                    <button class="btn btn-success" onclick="addServiceServer()">➕ 添加服务器</button>
+                </div>
+            `;
+
+        // 缓存服务器（配置 + 服务器）
+        document.getElementById('redisContent').innerHTML = `
+                <div class="server-row">
+                    <h5 class="mb-3">Redis 配置</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Redis 端口</label>
+                            <input type="text" class="form-control" id="redisPort" value="16379">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Redis 库序</label>
+                            <input type="text" class="form-control" id="redisRank" value="0">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Redis 密码</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="redisPassword">
+                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-3">缓存服务器列表</h5>
+                    <div id="redisServers"></div>
+                    <div class="text-end mt-3">
+                        <button class="btn btn-success" onclick="addRedisServer()">➕ 添加服务器</button>
+                    </div>
+                </div>
+            `;
+
+        // 添加初始服务器
+        serviceServerCount = 0;
+        redisServerCount = 0;
+        addServiceServer();
+        addRedisServer();
+
+        // 如果是编辑模式，填充现有配置
+        if (operationMode === 'edit') {
+            fillFormWithExistingConfig();
+        }
+
+        // 初始化验证
+        initializeValidation();
+        bindAutosaveHandlers();
+    }
+
+    // 初始化所有字段的验证
+    function initializeValidation() {
+        // IP地址验证
+        ['busDb_host', 'busDb_comm', 'riskDb_host', 'riskDb_comm', 'gateway_host', 'gateway_comm'].forEach(fieldId => {
+            addValidation(fieldId, 'ip', '请输入有效的IP地址');
+        });
+
+        // 端口号验证
+        ['busDb_port', 'busDb_dbPort', 'riskDb_port', 'riskDb_dbPort', 'gateway_port',
+            'redisPort', 'bus_web_port', 'risk_web_port'].forEach(fieldId => {
+            addValidation(fieldId, 'port', '请输入有效的端口号 (1-65535)');
+        });
+
+        // Redis 库序验证
+        addValidation('redisRank', 'redisRank', '请输入有效的库序 (0-15)');
+    }
+
+    // 添加服务器字段验证（通用函数）
+    function addServerValidation(serverType, serverId, id) {
+        // IP地址验证
+        addValidation(`${serverType}_${id}_host`, 'ip', '请输入有效的IP地址');
+        addValidation(`${serverType}_${id}_comm`, 'ip', '请输入有效的IP地址');
+        addValidation(`${serverType}_${id}_port`, 'port', '请输入有效的端口号 (1-65535)');
+
+        // 重复检查
+        const hostInput = document.getElementById(`${serverType}_${id}_host`);
+        const commInput = document.getElementById(`${serverType}_${id}_comm`);
+
+        [hostInput, commInput].forEach(input => {
+            input.addEventListener('blur', function() {
+                const host = hostInput.value.trim();
+                const comm = commInput.value.trim();
+                if (checkDuplicateServer(serverType, serverId, host, comm)) {
+                    alert('❌ 该服务器已存在（公网地址或内网地址重复）！');
+                    input.classList.add('is-invalid');
+                }
+            });
+        });
+    }
+
+    // 添加负载服务器
+    function addServiceServer(server = null) {
+        const id = serviceServerCount++;
+        const div = document.createElement('div');
+        div.className = 'server-row';
+        div.id = 'serviceServer_' + id;
+        div.innerHTML = `
+                <button class="btn-delete-row" onclick="removeServer('serviceServer_${id}')" title="删除此服务器">✕</button>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">公网地址</label>
+                        <input type="text" class="form-control" id="service_${id}_host" value="${server?.host || ''}" placeholder="47.79.255.xxx">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">内网地址</label>
+                        <input type="text" class="form-control" id="service_${id}_comm" value="${server?.comm || ''}" placeholder="172.19.55.xxx">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">SSH端口</label>
+                        <input type="text" class="form-control" id="service_${id}_port" value="${server?.port || '22'}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">SSH用户名</label>
+                        <input type="text" class="form-control" id="service_${id}_user" value="${server?.user || 'root'}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">SSH密码</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="service_${id}_pass" value="${server?.pass || ''}">
+                            <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 text-end">
+                        <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('service_${id}', false)">🔌 测试连接</button>
+                    </div>
+                </div>
+            `;
+        document.getElementById('serviceServers').appendChild(div);
+
+        // 添加验证和重复检查
+        addServerValidation('service', `serviceServer_${id}`, id);
+
+        // 更新删除按钮的显示状态
+        updateDeleteButtons('#serviceServers');
+    }
+
+    // 添加缓存服务器
+    function addRedisServer(server = null) {
+        const id = redisServerCount++;
+        const div = document.createElement('div');
+        div.className = 'server-row';
+        div.id = 'redisServer_' + id;
+        div.innerHTML = `
+                <button class="btn-delete-row" onclick="removeServer('redisServer_${id}')" title="删除此服务器">✕</button>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">公网地址</label>
+                        <input type="text" class="form-control" id="redis_${id}_host" value="${server?.host || ''}" placeholder="47.79.255.xxx">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">内网地址</label>
+                        <input type="text" class="form-control" id="redis_${id}_comm" value="${server?.comm || ''}" placeholder="172.19.55.xxx">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">SSH端口</label>
+                        <input type="text" class="form-control" id="redis_${id}_port" value="${server?.port || '22'}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">SSH用户名</label>
+                        <input type="text" class="form-control" id="redis_${id}_user" value="${server?.user || 'root'}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">SSH密码</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="redis_${id}_pass" value="${server?.pass || ''}">
+                            <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 text-end">
+                        <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('redis_${id}', false)">🔌 测试连接</button>
+                    </div>
+                </div>
+            `;
+        document.getElementById('redisServers').appendChild(div);
+
+        // 添加验证和重复检查
+        addServerValidation('redis', `redisServer_${id}`, id);
+
+        // 更新删除按钮的显示状态
+        updateDeleteButtons('#redisServers');
+    }
+
+    // 测试服务器连接
+    async function testServerConnection(prefix, hasDatabase) {
+        // 收集服务器信息
+        const host = document.getElementById(`${prefix}_host`)?.value.trim();
+        const comm = document.getElementById(`${prefix}_comm`)?.value.trim();
+        const port = document.getElementById(`${prefix}_port`)?.value.trim() || '22';
+        const user = document.getElementById(`${prefix}_user`)?.value.trim() || 'root';
+        const pass = document.getElementById(`${prefix}_pass`)?.value.trim();
+
+        // 验证必填项
+        if (!host) {
+            alert('❌ 请先填写公网地址！');
+            return;
+        }
+
+        // 验证IP格式或域名格式
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+        if (!ipPattern.test(host) && !domainPattern.test(host)) {
+            alert('❌ 公网地址格式不正确！\n请输入有效的IP地址或域名。');
+            return;
+        }
+
+        // 如果是IP，验证每个段是否在0-255范围内
+        if (ipPattern.test(host)) {
+            const segments = host.split('.');
+            for (let segment of segments) {
+                const num = parseInt(segment);
+                if (num < 0 || num > 255) {
+                    alert('❌ IP地址格式不正确！\n每个段的值应在 0-255 之间。');
+                    return;
+                }
+            }
+        }
+
+        // 验证端口号
+        const portNum = parseInt(port);
+        if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+            alert('❌ SSH端口号不正确！\n端口号应在 1-65535 之间。');
+            return;
+        }
+
+        // 验证内网地址（如果填写了）
+        if (comm) {
+            if (!ipPattern.test(comm) && !domainPattern.test(comm)) {
+                alert('❌ 内网地址格式不正确！');
+                return;
+            }
+        }
+
+        // 数据库配置验证
+        let dbInfo = '';
+        if (hasDatabase) {
+            const dbPort = document.getElementById(`${prefix}_dbPort`)?.value.trim();
+            const dbUser = document.getElementById(`${prefix}_dbUser`)?.value.trim();
+            const dbPass = document.getElementById(`${prefix}_dbPass`)?.value.trim();
+
+            if (dbPort) {
+                const dbPortNum = parseInt(dbPort);
+                if (isNaN(dbPortNum) || dbPortNum < 1 || dbPortNum > 65535) {
+                    alert('❌ 数据库端口号不正确！\n端口号应在 1-65535 之间。');
+                    return;
+                }
+                dbInfo = '\n\n📊 数据库配置：\n  端口: ' + dbPort + '\n  用户: ' + (dbUser || '未填写') + '\n  密码: ' + (dbPass ? '已填写' : '未填写');
+            }
+        }
+
+        const testConfig = {
+            kind: hasDatabase ? 'database' : 'server',
+            label: connectionTestLabel(prefix, hasDatabase),
+            server: { host, comm, port, user, pass }
+        };
+
+        if (hasDatabase) {
+            testConfig.database = {
+                host,
+                port: document.getElementById(`${prefix}_dbPort`)?.value.trim(),
+                user: document.getElementById(`${prefix}_dbUser`)?.value.trim() || 'root',
+                pass: document.getElementById(`${prefix}_dbPass`)?.value.trim() || ''
+            };
+        }
+
+        try {
+            await triggerConnectionTest(testConfig);
+        } catch (error) {
+            alert('❌ 连接测试触发失败：' + error.message);
+        }
+    }
+
+    function connectionTestLabel(prefix, hasDatabase) {
+        const labels = {
+            busDb: '业务数据库',
+            riskDb: '风控数据库',
+            gateway: '网关服务器'
+        };
+        if (labels[prefix]) return labels[prefix];
+        if (prefix.startsWith('service_')) return '业务服务器';
+        if (prefix.startsWith('redis_')) return 'Redis 服务器';
+        return hasDatabase ? '数据库服务器' : '服务器';
+    }
+
+    function deployPlatformRepositoryValue() {
+        const value = document.getElementById('deployPlatformRepository')?.value.trim();
+        return value && value !== '__REPOSITORY__' ? value : 'ceenads/project-iaa-platform';
+    }
+
+    function githubTokenValue() {
+        return document.getElementById('deployGithubToken')?.value.trim() || currentConfig?.setup?.deploy?.token || '';
+    }
+
+    async function triggerConnectionTest(testConfig) {
+        const token = githubTokenValue();
+        if (!token) {
+            alert('❌ 请先在部署页填写 GitHub Token，连接测试需要用它触发 platform 仓库的测试 workflow。');
+            showMainTab('deploy');
+            return;
+        }
+
+        const platform = parseRepo(deployPlatformRepositoryValue(), 'Platform');
+        const ref = document.getElementById('deployPlatformWorkflowRef')?.value.trim() || 'master';
+
+        const response = await fetch(`https://api.github.com/repos/${platform.owner}/${platform.name}/actions/workflows/connection-test.yml/dispatches`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': 'Bearer ' + token,
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ref,
+                inputs: {
+                    test_config: JSON.stringify(testConfig)
+                }
+            })
+        });
+
+        if (response.status !== 204) {
+            const text = await response.text();
+            throw new Error(`连接测试 workflow 触发失败，GitHub API 返回 ${response.status}: ${text}`);
+        }
+
+        window.open(`https://github.com/${platform.repo}/actions/workflows/connection-test.yml`, '_blank');
+        alert(`✅ 连接测试已触发：${testConfig.label}\n\n测试会在 platform 仓库的 Actions 中执行，结果请查看刚打开的 workflow 页面。`);
+    }
+
+    // 删除服务器
+    function removeServer(serverId) {
+        const element = document.getElementById(serverId);
+        if (element) {
+            // 检查是负载服务器还是缓存服务器
+            const isServiceServer = serverId.startsWith('serviceServer_');
+            const containerSelector = isServiceServer ? '#serviceServers' : '#redisServers';
+            const container = document.querySelector(containerSelector);
+            const serverCount = container.querySelectorAll('.server-row').length;
+
+            // 至少保留一个服务器
+            if (serverCount <= 1) {
+                alert(isServiceServer ? '至少需要保留一个负载服务器！' : '至少需要保留一个缓存服务器！');
+                return;
+            }
+
+            element.remove();
+
+            // 更新删除按钮的显示状态
+            updateDeleteButtons(containerSelector);
+        }
+    }
+
+    // 更新删除按钮的显示状态
+    function updateDeleteButtons(containerSelector) {
+        const container = document.querySelector(containerSelector);
+        const servers = container.querySelectorAll('.server-row');
+        const deleteButtons = container.querySelectorAll('.btn-delete-row');
+
+        // 如果只有一个服务器，隐藏删除按钮；否则显示
+        deleteButtons.forEach(btn => {
+            btn.style.display = servers.length <= 1 ? 'none' : 'block';
+        });
+    }
+
+    // 填充现有配置
+    function fillFormWithExistingConfig() {
+        const domainConfig = currentConfig.web.find(w => w.domain === selectedDomain);
+        if (!domainConfig) {
+            return;
+        }
+
+        // 参数设置
+        // 网络共享凭据（从 volumes 中提取）
+        const busVolumes = domainConfig.system?.bus?.java?.volumes;
+        if (busVolumes && busVolumes.length > 0) {
+            const credentials = busVolumes[0].mount?.config?.credentials || '';
+            const lines = credentials.split('\n');
+            const username = lines[0]?.split('=')[1] || 'ceenads';
+            const password = lines[1]?.split('=')[1] || '';
+            document.getElementById('share_username').value = username;
+            document.getElementById('share_password').value = password;
+        }
+
+        // 管理员账号
+        const busJavaEnv = domainConfig.system?.bus?.java?.environment;
+        if (busJavaEnv) {
+            document.getElementById('bus_admin_user').value = busJavaEnv.ADMIN_USER || 'admin';
+            document.getElementById('bus_admin_pass').value = busJavaEnv.ADMIN_PASS || '';
+        }
+        const riskJavaEnv = domainConfig.system?.risk?.java?.environment;
+        if (riskJavaEnv) {
+            document.getElementById('risk_admin_user').value = riskJavaEnv.ADMIN_USER || 'admin';
+            document.getElementById('risk_admin_pass').value = riskJavaEnv.ADMIN_PASS || '';
+        }
+
+        // Web 服务配置
+        const busWebNginx = domainConfig.system?.bus?.web?.nginx;
+        if (busWebNginx) {
+            document.getElementById('bus_web_path').value = busWebNginx.html_sub_path || '/bus';
+            document.getElementById('bus_web_port').value = busWebNginx.listen_port || '8010';
+        }
+        const riskWebNginx = domainConfig.system?.risk?.web?.nginx;
+        if (riskWebNginx) {
+            document.getElementById('risk_web_path').value = riskWebNginx.html_sub_path || '/risk';
+            document.getElementById('risk_web_port').value = riskWebNginx.listen_port || '8020';
+        }
+
+        // 业务数据库
+        const busDbMysql = domainConfig.system?.bus?.mysql;
+        const busDbServer = busDbMysql?.servers?.[0];
+        const busDbConfig = busDbMysql?.config;
+
+        if (busDbServer) {
+            // 从 mysql.servers[0] 读取数据库服务器信息
+            document.getElementById('busDb_host').value = busDbServer.host || '';
+            document.getElementById('busDb_comm').value = busDbServer.comm || '';
+            document.getElementById('busDb_port').value = busDbServer.port || '22';
+            document.getElementById('busDb_user').value = busDbServer.user || 'root';
+            document.getElementById('busDb_pass').value = busDbServer.pass || '';
+        }
+        if (busDbConfig) {
+            // 从 mysql.config 读取数据库配置信息
+            document.getElementById('busDb_dbPort').value = busDbConfig.port || '';
+            document.getElementById('busDb_dbUser').value = busDbConfig.username || '';
+            document.getElementById('busDb_dbPass').value = busDbConfig.password || '';
+        }
+
+        // 风控数据库
+        const riskDbMysql = domainConfig.system?.risk?.mysql;
+        const riskDbServer = riskDbMysql?.servers?.[0];
+        const riskDbConfig = riskDbMysql?.config;
+
+        if (riskDbServer) {
+            // 从 mysql.servers[0] 读取数据库服务器信息
+            document.getElementById('riskDb_host').value = riskDbServer.host || '';
+            document.getElementById('riskDb_comm').value = riskDbServer.comm || '';
+            document.getElementById('riskDb_port').value = riskDbServer.port || '22';
+            document.getElementById('riskDb_user').value = riskDbServer.user || 'root';
+            document.getElementById('riskDb_pass').value = riskDbServer.pass || '';
+        }
+        if (riskDbConfig) {
+            // 从 mysql.config 读取数据库配置信息
+            document.getElementById('riskDb_dbPort').value = riskDbConfig.port || '';
+            document.getElementById('riskDb_dbUser').value = riskDbConfig.username || '';
+            document.getElementById('riskDb_dbPass').value = riskDbConfig.password || '';
+        }
+
+        // 网关服务器
+        const gatewayServer = domainConfig.system?.service?.nginx?.servers?.[0];
+        if (gatewayServer) {
+            document.getElementById('gateway_host').value = gatewayServer.host || '';
+            document.getElementById('gateway_comm').value = gatewayServer.comm || '';
+            document.getElementById('gateway_port').value = gatewayServer.port || '22';
+            document.getElementById('gateway_user').value = gatewayServer.user || 'root';
+            document.getElementById('gateway_pass').value = gatewayServer.pass || '';
+        }
+
+        // 负载服务器
+        const serviceServers = domainConfig.system?.service?.producer?.servers || [];
+        document.getElementById('serviceServers').innerHTML = '';
+        serviceServerCount = 0;
+        if (serviceServers.length > 0) {
+            serviceServers.forEach(server => addServiceServer(server));
+        } else {
+            addServiceServer();
+        }
+
+        // 缓存服务器
+        const redisServers = domainConfig.system?.service?.redis?.servers || [];
+        document.getElementById('redisServers').innerHTML = '';
+        redisServerCount = 0;
+        if (redisServers.length > 0) {
+            redisServers.forEach(server => addRedisServer(server));
+        } else {
+            addRedisServer();
+        }
+
+        // Redis配置（从顶层 environment 读取）
+        const redisEnv = domainConfig.environment;
+        if (redisEnv) {
+            document.getElementById('redisPort').value = redisEnv.REDIS_PORT || '16379';
+            document.getElementById('redisRank').value = redisEnv.REDIS_RANK || '0';
+            document.getElementById('redisPassword').value = redisEnv.REDIS_PASS || '';
+        }
+    }
+
+    // 从表单生成配置
+    function generateConfigFromForm(options = {}) {
+        const strict = options.strict !== false;
+        // 收集参数设置
+        const shareUsername = document.getElementById('share_username').value.trim() || 'ceenads';
+        const sharePassword = document.getElementById('share_password').value.trim();
+        const busAdminUser = document.getElementById('bus_admin_user').value.trim() || 'admin';
+        const busAdminPass = document.getElementById('bus_admin_pass').value.trim();
+        const riskAdminUser = document.getElementById('risk_admin_user').value.trim() || 'admin';
+        const riskAdminPass = document.getElementById('risk_admin_pass').value.trim();
+        const busWebPath = document.getElementById('bus_web_path').value.trim() || '/bus';
+        const busWebPort = parseInt(document.getElementById('bus_web_port').value.trim()) || 8010;
+        const riskWebPath = document.getElementById('risk_web_path').value.trim() || '/risk';
+        const riskWebPort = parseInt(document.getElementById('risk_web_port').value.trim()) || 8020;
+
+        // 收集业务数据库服务器配置
+        const busDbServer = {
+            identify: "",
+            host: document.getElementById('busDb_host').value.trim(),
+            comm: document.getElementById('busDb_comm').value.trim(),
+            port: parseInt(document.getElementById('busDb_port').value.trim()) || 22,
+            user: document.getElementById('busDb_user').value.trim() || 'root',
+            pass: document.getElementById('busDb_pass').value.trim()
+        };
+
+        // 收集业务数据库配置
+        const busDbConfig = {
+            port: parseInt(document.getElementById('busDb_dbPort').value.trim()),
+            username: document.getElementById('busDb_dbUser').value.trim(),
+            password: document.getElementById('busDb_dbPass').value.trim()
+        };
+
+        // 收集风控数据库服务器配置
+        const riskDbServer = {
+            identify: "",
+            host: document.getElementById('riskDb_host').value.trim(),
+            comm: document.getElementById('riskDb_comm').value.trim(),
+            port: parseInt(document.getElementById('riskDb_port').value.trim()) || 22,
+            user: document.getElementById('riskDb_user').value.trim() || 'root',
+            pass: document.getElementById('riskDb_pass').value.trim()
+        };
+
+        // 收集风控数据库配置
+        const riskDbConfig = {
+            port: parseInt(document.getElementById('riskDb_dbPort').value.trim()),
+            username: document.getElementById('riskDb_dbUser').value.trim(),
+            password: document.getElementById('riskDb_dbPass').value.trim()
+        };
+
+        // 收集网关服务器配置
+        const gatewayServer = {
+            identify: "",
+            host: document.getElementById('gateway_host').value.trim(),
+            comm: document.getElementById('gateway_comm').value.trim(),
+            port: parseInt(document.getElementById('gateway_port').value.trim()) || 22,
+            user: document.getElementById('gateway_user').value.trim() || 'root',
+            pass: document.getElementById('gateway_pass').value.trim()
+        };
+
+        // 收集负载服务器配置
+        const producerServers = [];
+        document.querySelectorAll('[id^="serviceServer_"]').forEach(row => {
+            const id = row.id.split('_')[1];
+            const server = {
+                identify: "",
+                host: document.getElementById(`service_${id}_host`).value.trim(),
+                comm: document.getElementById(`service_${id}_comm`).value.trim(),
+                port: parseInt(document.getElementById(`service_${id}_port`).value.trim()) || 22,
+                user: document.getElementById(`service_${id}_user`).value.trim() || 'root',
+                pass: document.getElementById(`service_${id}_pass`).value.trim()
+            };
+            if (server.host) {
+                producerServers.push(server);
+            }
+        });
+
+        // 收集Redis服务器配置
+        const redisServers = [];
+        document.querySelectorAll('[id^="redisServer_"]').forEach(row => {
+            const id = row.id.split('_')[1];
+            const server = {
+                identify: "",
+                host: document.getElementById(`redis_${id}_host`).value.trim(),
+                comm: document.getElementById(`redis_${id}_comm`).value.trim(),
+                port: parseInt(document.getElementById(`redis_${id}_port`).value.trim()) || 22,
+                user: document.getElementById(`redis_${id}_user`).value.trim() || 'root',
+                pass: document.getElementById(`redis_${id}_pass`).value.trim()
+            };
+            if (server.host) {
+                redisServers.push(server);
+            }
+        });
+
+        // 收集Redis配置
+        const redisPort = parseInt(document.getElementById('redisPort').value.trim()) || 16379;
+        const redisRank = parseInt(document.getElementById('redisRank').value.trim()) || 0;
+        const redisPassword = document.getElementById('redisPassword').value.trim();
+
+        // 验证必填项
+        if (strict && (!busDbServer.host || !riskDbServer.host || !gatewayServer.host)) {
+            alert('❌ 请填写所有必填的服务器地址！');
+            return false;
+        }
+
+        if (strict && producerServers.length === 0) {
+            alert('❌ 请至少添加一台负载服务器！');
+            return false;
+        }
+
+        if (strict && redisServers.length === 0) {
+            alert('❌ 请至少添加一台缓存服务器！');
+            return false;
+        }
+
+        // 从第一台Redis服务器获取REDIS_HOST
+        const redisHost = redisServers[0]?.comm || '';
+
+        // 生成volumes配置模板
+        const volumesTemplate = (outerPath, interPath, shareName) => ({
+            outer: outerPath,
+            inter: interPath,
+            mount: {
+                command: "sudo yum -y install cifs-utils",
+                config: {
+                    type: "cifs",
+                    name: shareName,
+                    credentials: `username=${shareUsername}\npassword=${sharePassword}`,
+                    option: "vers=3.0,uid=1000,gid=1000,file_mode=0644,dir_mode=0755,nobrl,_netdev"
+                }
+            }
+        });
+
+        // 构建完整的域名配置
+        const domainConfig = {
+            domain: selectedDomain,
+            environment: {
+                REDIS_HOST: redisHost,
+                REDIS_PORT: redisPort,
+                REDIS_RANK: redisRank,
+                REDIS_PASS: redisPassword
+            },
+            system: {
+                service: {
+                    nginx: {
+                        environment: {},
+                        config: {
+                            path: "/data/service/nginx"
+                        },
+                        servers: [gatewayServer],
+                        volumes: [
+                            volumesTemplate("/data/scripts", "/usr/share/nginx/upload", "//iaa.ceenmobi.com/scripts")
+                        ]
+                    },
+                    redis: {
+                        environment: {
+                            PORT: redisPort,
+                            PASS: redisPassword
+                        },
+                        servers: redisServers
+                    },
+                    producer: {
+                        environment: {
+                            DB_BUS_HOST: busDbServer.comm,
+                            DB_BUS_PORT: busDbConfig.port,
+                            DB_BUS_USER: busDbConfig.username,
+                            DB_BUS_PASS: busDbConfig.password,
+                            DB_RISK_HOST: riskDbServer.comm,
+                            DB_RISK_PORT: riskDbConfig.port,
+                            DB_RISK_USER: riskDbConfig.username,
+                            DB_RISK_PASS: riskDbConfig.password,
+                            GATEWAY_PUBLIC_ADDRESS: selectedDomain,
+                            GATEWAY_PRIVATE_ADDRESS: gatewayServer.comm
+                        },
+                        servers: producerServers,
+                        volumes: [
+                            volumesTemplate("/data/android", "/data/android", "//iaa.ceenmobi.com/android"),
+                            volumesTemplate("/data/dbfiles", "/data/dbfiles", "//iaa.ceenmobi.com/dbfiles"),
+                            volumesTemplate("/data/scripts", "/data/scripts", "//iaa.ceenmobi.com/scripts"),
+                            volumesTemplate("/data/webview", "/data/webview", "//iaa.ceenmobi.com/webview")
+                        ]
+                    }
+                },
+                bus: {
+                    java: {
+                        environment: {
+                            DB_HOST: busDbServer.comm,
+                            DB_PORT: busDbConfig.port,
+                            DB_USER: busDbConfig.username,
+                            DB_PASS: busDbConfig.password,
+                            ADMIN_USER: busAdminUser,
+                            ADMIN_PASS: busAdminPass,
+                            RISK_HOST: gatewayServer.comm,
+                            RISK_PORT: 8082
+                        },
+                        servers: [gatewayServer],
+                        volumes: [
+                            volumesTemplate("/data/android", "/data/android", "//iaa.ceenmobi.com/android"),
+                            volumesTemplate("/data/dbfiles", "/data/dbfiles", "//iaa.ceenmobi.com/dbfiles"),
+                            volumesTemplate("/data/scripts", "/data/scripts", "//iaa.ceenmobi.com/scripts"),
+                            volumesTemplate("/data/webview", "/data/webview", "//iaa.ceenmobi.com/webview")
+                        ]
+                    },
+                    web: {
+                        nginx: {
+                            html_sub_path: busWebPath,
+                            listen_port: busWebPort
+                        }
+                    },
+                    mysql: {
+                        config: busDbConfig,
+                        servers: [busDbServer]
+                    }
+                },
+                risk: {
+                    java: {
+                        environment: {
+                            DB_HOST: riskDbServer.comm,
+                            DB_PORT: riskDbConfig.port,
+                            DB_USER: riskDbConfig.username,
+                            DB_PASS: riskDbConfig.password,
+                            ADMIN_USER: riskAdminUser,
+                            ADMIN_PASS: riskAdminPass
+                        },
+                        servers: [gatewayServer],
+                        volumes: [
+                            volumesTemplate("/data/android", "/data/android", "//iaa.ceenmobi.com/android"),
+                            volumesTemplate("/data/dbfiles", "/data/dbfiles", "//iaa.ceenmobi.com/dbfiles"),
+                            volumesTemplate("/data/scripts", "/data/scripts", "//iaa.ceenmobi.com/scripts"),
+                            volumesTemplate("/data/webview", "/data/webview", "//iaa.ceenmobi.com/webview")
+                        ]
+                    },
+                    web: {
+                        nginx: {
+                            html_sub_path: riskWebPath,
+                            listen_port: riskWebPort
+                        }
+                    },
+                    mysql: {
+                        config: riskDbConfig,
+                        servers: [riskDbServer]
+                    }
+                }
+            }
+        };
+
+        // 更新或添加到配置
+        const existingIndex = currentConfig.web.findIndex(w => w.domain === selectedDomain);
+        if (existingIndex >= 0) {
+            currentConfig.web[existingIndex] = domainConfig;
+        } else {
+            currentConfig.web.push(domainConfig);
+        }
+
+        return true;
+    }
+
+    // 生成端口放行提醒
+    function generatePortReminder() {
+        const content = document.getElementById('portReminderContent');
+        content.innerHTML = '';
+
+        if (!currentConfig || !currentConfig.web) return;
+
+        const domainConfig = currentConfig.web.find(w => w.domain === selectedDomain);
+        if (!domainConfig) return;
+
+        // 使用 Map 来合并同一服务器的端口和角色
+        const serverMap = new Map();
+
+        // 辅助函数：添加服务器信息
+        function addServerInfo(host, sshPort, role, ports) {
+            if (!serverMap.has(host)) {
+                serverMap.set(host, {
+                    host: host,
+                    sshPort: sshPort || 22,
+                    roles: [],
+                    ports: new Map() // 使用 Map 避免端口重复
+                });
+            }
+
+            const serverInfo = serverMap.get(host);
+            serverInfo.roles.push(role);
+
+            // 添加 SSH 端口（如果端口已存在，合并描述）
+            const sshPortNum = sshPort || 22;
+            if (serverInfo.ports.has(sshPortNum)) {
+                const existingDesc = serverInfo.ports.get(sshPortNum);
+                if (!existingDesc.includes('SSH')) {
+                    serverInfo.ports.set(sshPortNum, existingDesc + ' + SSH');
+                }
+            } else {
+                serverInfo.ports.set(sshPortNum, 'SSH');
+            }
+
+            // 添加其他端口（如果端口已存在，合并描述）
+            if (ports) {
+                ports.forEach(p => {
+                    if (serverInfo.ports.has(p.port)) {
+                        const existingDesc = serverInfo.ports.get(p.port);
+                        if (!existingDesc.includes(p.desc)) {
+                            serverInfo.ports.set(p.port, existingDesc + ' + ' + p.desc);
+                        }
+                    } else {
+                        serverInfo.ports.set(p.port, p.desc);
+                    }
+                });
+            }
+        }
+
+        // 业务数据库服务器
+        const busDbServer = domainConfig.system?.bus?.mysql?.servers?.[0];
+        if (busDbServer) {
+            addServerInfo(
+                busDbServer.host,
+                busDbServer.port,
+                '业务数据库',
+                [{ port: domainConfig.system.bus.mysql.config?.port || 13367, desc: 'MySQL(业务)' }]
+            );
+        }
+
+        // 风控数据库服务器
+        const riskDbServer = domainConfig.system?.risk?.mysql?.servers?.[0];
+        if (riskDbServer) {
+            addServerInfo(
+                riskDbServer.host,
+                riskDbServer.port,
+                '风控数据库',
+                [{ port: domainConfig.system.risk.mysql.config?.port || 13368, desc: 'MySQL(风控)' }]
+            );
+        }
+
+        // 网关服务器
+        const gatewayServers = domainConfig.system?.service?.nginx?.servers || [];
+        const busWebPort = domainConfig.system?.bus?.web?.nginx?.listen_port || 8010;
+        const riskWebPort = domainConfig.system?.risk?.web?.nginx?.listen_port || 8020;
+
+        gatewayServers.forEach((server) => {
+            addServerInfo(
+                server.host,
+                server.port,
+                '网关',
+                [
+                    { port: 80, desc: 'HTTP' },
+                    { port: 443, desc: 'HTTPS' },
+                    { port: busWebPort, desc: 'Web(业务)' },
+                    { port: riskWebPort, desc: 'Web(风控)' },
+                    { port: 8081, desc: 'Java(业务)' },
+                    { port: 8082, desc: 'Java(风控)' }
+                ]
+            );
+        });
+
+        // 负载服务器
+        const producerServers = domainConfig.system?.service?.producer?.servers || [];
+        producerServers.forEach((server) => {
+            addServerInfo(
+                server.host,
+                server.port,
+                '负载',
+                [
+                    { port: 8000, desc: 'Producer' },
+                    { port: 8001, desc: 'Producer' },
+                    { port: 8002, desc: 'Producer' },
+                    { port: 8003, desc: 'Producer' }
+                ]
+            );
+        });
+
+        // 缓存服务器
+        const redisServers = domainConfig.system?.service?.redis?.servers || [];
+        const redisPort = domainConfig.system?.service?.redis?.environment?.PORT || 16379;
+        redisServers.forEach((server) => {
+            addServerInfo(
+                server.host,
+                server.port,
+                '缓存',
+                [{ port: redisPort, desc: 'Redis' }]
+            );
+        });
+
+        // 生成HTML
+        serverMap.forEach((serverInfo, host) => {
+            const div = document.createElement('div');
+            div.className = 'server-port-info';
+
+            // 角色列表
+            const roleText = serverInfo.roles.join(' + ');
+
+            // 端口列表（去重并排序）
+            const sortedPorts = Array.from(serverInfo.ports.entries())
+                .sort((a, b) => a[0] - b[0]);
+
+            // 合并相同端口的描述，用 + 连接
+            const portBadges = sortedPorts.map(([port, desc]) => {
+                // desc 可能已经包含多个用途，用 + 连接
+                return `<span class="port-badge">${port} (${desc})</span>`;
+            }).join('');
+
+            div.innerHTML = `
+                    <div class="server-name">🖥️ ${roleText}服务器</div>
+                    <div class="server-ip">📍 ${host}</div>
+                    <div class="port-list">${portBadges}</div>
+                `;
+
+            content.appendChild(div);
+        });
+    }
+
+    // 生成域名解析提醒
+    function generateDnsReminder() {
+        const content = document.getElementById('dnsReminderContent');
+        content.innerHTML = '';
+
+        if (!currentConfig || !currentConfig.web) return;
+
+        const domainConfig = currentConfig.web.find(w => w.domain === selectedDomain);
+        if (!domainConfig) return;
+
+        // 获取网关服务器的公网IP
+        const gatewayServer = domainConfig.system?.service?.nginx?.servers?.[0];
+        if (!gatewayServer) return;
+
+        content.innerHTML = `请将域名 <span class="dns-domain">${selectedDomain}</span> 解析到 <span class="dns-ip">${gatewayServer.host}</span>`;
+    }
+
+    // 生成预览
+    function generatePreview() {
+        if (previewEditor) {
+            previewEditor.set(currentConfig);
+        }
+        generateDnsReminder();
+        generatePortReminder();
+        refreshDeployDomainOptions();
+    }
+
+    // 下载配置
+    function downloadConfig() {
+        if (activeMainTab === 'config' && !saveCurrentDomainDraft(false)) {
+            return;
+        }
+        if (!syncEditorConfig()) {
+            return;
+        }
+        saveDeploySetup();
+        generatePreview();
+        const configText = JSON.stringify(currentConfig, null, 2);
+        const blob = new Blob([configText], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'iaa-config.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        alert('✅ 配置文件已下载。');
+    }
+
+    const DEPLOY_WORKFLOW_FILE = 'deploy.yml';
+    const DEPLOY_RUN_FIND_TIMEOUT_MS = 90000;
+    const DEPLOY_RUN_FIND_INTERVAL_MS = 5000;
+    const DEPLOY_RUN_POLL_INTERVAL_MS = 8000;
+    const deployMonitorState = {};
+
+    function resetDeployLog() {
+        const el = document.getElementById('deployResultLog');
+        if (el) {
+            el.textContent = '等待部署...';
+        }
+    }
+
+    function deployLog(message) {
+        const el = document.getElementById('deployResultLog');
+        if (!el) return;
+        const line = '[' + new Date().toLocaleTimeString() + '] ' + message;
+        el.textContent = el.textContent === '等待部署...' ? line : el.textContent + '\n' + line;
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function githubHeaders(token, extraHeaders = {}) {
+        return {
+            'Accept': 'application/vnd.github+json',
+            'Authorization': 'Bearer ' + token,
+            'X-GitHub-Api-Version': '2022-11-28',
+            ...extraHeaders
+        };
+    }
+
+    async function githubJson(url, token, options = {}) {
+        const response = await fetch(url, {
+            ...options,
+            headers: githubHeaders(token, options.headers || {})
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`GitHub API 返回 ${response.status}: ${text}`);
+        }
+        return response.json();
+    }
+
+    function workflowRunsUrl({ owner, name }, workflowFile, ref) {
+        const workflow = encodeURIComponent(workflowFile);
+        const params = new URLSearchParams({
+            branch: ref || 'master',
+            event: 'workflow_dispatch',
+            per_page: '20'
+        });
+        return `https://api.github.com/repos/${owner}/${name}/actions/workflows/${workflow}/runs?${params.toString()}`;
+    }
+
+    function workflowRunUrl({ owner, name }, runId) {
+        return `https://api.github.com/repos/${owner}/${name}/actions/runs/${runId}`;
+    }
+
+    function workflowJobsUrl({ owner, name }, runId) {
+        return `https://api.github.com/repos/${owner}/${name}/actions/runs/${runId}/jobs?per_page=100`;
+    }
+
+    function workflowJobLogsUrl({ owner, name }, jobId) {
+        return `https://api.github.com/repos/${owner}/${name}/actions/jobs/${jobId}/logs`;
+    }
+
+    function statusLabel(status, conclusion) {
+        if (status === 'completed') {
+            const conclusions = {
+                success: '成功',
+                failure: '失败',
+                cancelled: '已取消',
+                skipped: '已跳过',
+                timed_out: '超时',
+                action_required: '需要处理',
+                neutral: '无结果'
+            };
+            return conclusions[conclusion] || conclusion || '已完成';
+        }
+        const statuses = {
+            queued: '排队中',
+            requested: '已请求',
+            waiting: '等待中',
+            pending: '准备中',
+            in_progress: '执行中'
+        };
+        return statuses[status] || status || '未知';
+    }
+
+    function changedDeployState(state, key, value) {
+        if (state[key] === value) {
+            return false;
+        }
+        state[key] = value;
+        return true;
+    }
+
+    async function findWorkflowRun(repoInfo, ref, token, startedAt) {
+        const deadline = Date.now() + DEPLOY_RUN_FIND_TIMEOUT_MS;
+        const earliest = new Date(startedAt.getTime() - 15000);
+        let waitingLoggedAt = 0;
+
+        while (Date.now() < deadline) {
+            const data = await githubJson(workflowRunsUrl(repoInfo, DEPLOY_WORKFLOW_FILE, ref), token);
+            const runs = (data.workflow_runs || [])
+                .filter(run => new Date(run.created_at) >= earliest)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            if (runs.length > 0) {
+                return runs[0];
+            }
+
+            if (Date.now() - waitingLoggedAt > 12000) {
+                deployLog(`${repoInfo.repo} 等待 GitHub 创建 workflow run...`);
+                waitingLoggedAt = Date.now();
+            }
+            await sleep(DEPLOY_RUN_FIND_INTERVAL_MS);
+        }
+
+        throw new Error(`${repoInfo.repo} 未找到刚触发的 deploy workflow run，请打开 Actions 确认是否已启动`);
+    }
+
+    function normalizeJobLog(text) {
+        if (!text || text.charCodeAt(0) === 0x50 && text.charCodeAt(1) === 0x4b) {
+            return [];
+        }
+        return text
+            .replace(/\x1b\[[0-9;]*m/g, '')
+            .split(/\r?\n/)
+            .map(line => line.trimEnd())
+            .filter(Boolean);
+    }
+
+    async function appendJobLogTail(repoInfo, job, token, state) {
+        if (!['in_progress', 'completed'].includes(job.status)) {
+            return;
+        }
+
+        const key = String(job.id);
+        if (state.finishedLogs[key] && job.status === 'completed') {
+            return;
+        }
+
+        try {
+            const response = await fetch(workflowJobLogsUrl(repoInfo, job.id), {
+                headers: githubHeaders(token)
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const lines = normalizeJobLog(await response.text());
+            if (lines.length === 0) {
+                return;
+            }
+
+            const previousCount = state.logLineCounts[key] || 0;
+            const nextLines = lines.slice(previousCount);
+            state.logLineCounts[key] = lines.length;
+            if (job.status === 'completed') {
+                state.finishedLogs[key] = true;
+            }
+
+            nextLines.slice(-12).forEach(line => {
+                deployLog(`${repoInfo.repo} / ${job.name} | ${line.slice(0, 260)}`);
+            });
+        } catch (error) {
+            if (!state.logReadErrors[key]) {
+                state.logReadErrors[key] = true;
+                deployLog(`${repoInfo.repo} / ${job.name} 原始日志无法直接读取：${error.message}，可点击 Run 链接查看完整日志。`);
+            }
+        }
+    }
+
+    async function monitorWorkflowRun(repoInfo, run, token) {
+        const stateKey = `${repoInfo.repo}:${run.id}`;
+        const state = deployMonitorState[stateKey] || {
+            jobs: {},
+            steps: {},
+            logLineCounts: {},
+            logReadErrors: {},
+            finishedLogs: {}
+        };
+        deployMonitorState[stateKey] = state;
+
+        deployLog(`${repoInfo.repo} Run #${run.run_number}: ${run.html_url}`);
+
+        while (true) {
+            const latestRun = await githubJson(workflowRunUrl(repoInfo, run.id), token);
+            const runStatus = `${latestRun.status}:${latestRun.conclusion || ''}`;
+            if (changedDeployState(state, 'runStatus', runStatus)) {
+                deployLog(`${repoInfo.repo} Run 状态：${statusLabel(latestRun.status, latestRun.conclusion)}`);
+            }
+
+            const jobsPayload = await githubJson(workflowJobsUrl(repoInfo, run.id), token);
+            const jobs = jobsPayload.jobs || [];
+
+            for (const job of jobs) {
+                const jobStatus = `${job.status}:${job.conclusion || ''}`;
+                if (state.jobs[job.id] !== jobStatus) {
+                    state.jobs[job.id] = jobStatus;
+                    deployLog(`${repoInfo.repo} Job ${job.name}：${statusLabel(job.status, job.conclusion)}`);
+                }
+
+                for (const step of job.steps || []) {
+                    const stepKey = `${job.id}:${step.number}:${step.name}`;
+                    const stepStatus = `${step.status}:${step.conclusion || ''}`;
+                    if (state.steps[stepKey] !== stepStatus) {
+                        state.steps[stepKey] = stepStatus;
+                        deployLog(`${repoInfo.repo} Step ${job.name} / ${step.name}：${statusLabel(step.status, step.conclusion)}`);
+                    }
+                }
+
+                await appendJobLogTail(repoInfo, job, token, state);
+            }
+
+            if (latestRun.status === 'completed') {
+                const finalStatus = statusLabel(latestRun.status, latestRun.conclusion);
+                deployLog(`${repoInfo.repo} 部署结束：${finalStatus}`);
+                if (latestRun.conclusion !== 'success') {
+                    throw new Error(`${repoInfo.repo} 部署未成功：${finalStatus}`);
+                }
+                return latestRun;
+            }
+
+            await sleep(DEPLOY_RUN_POLL_INTERVAL_MS);
+        }
+    }
+
+    function deploySetup() {
+        currentConfig.setup = currentConfig.setup || {};
+        currentConfig.setup.deploy = currentConfig.setup.deploy || {};
+        return currentConfig.setup.deploy;
+    }
+
+    function parseRepo(repo, label) {
+        const value = repo.trim();
+        const parts = value.split('/');
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            throw new Error(`${label} 仓库格式必须是 owner/repo`);
+        }
+        return { repo: value, owner: parts[0], name: parts[1] };
+    }
+
+    function checkedDeployComponents() {
+        return Array.from(document.querySelectorAll('.deploy-component:checked')).map(input => input.value);
+    }
+
+    function setCheckedDeployComponents(values) {
+        const selected = new Set(values || []);
+        document.querySelectorAll('.deploy-component').forEach(input => {
+            input.checked = selected.size === 0 ? input.defaultChecked : selected.has(input.value);
+        });
+    }
+
+    function serviceComponentImageVersion(setup, name, fallback) {
+        return setup.service_components?.[name]?.image_version || setup[`${name}_version`] || fallback;
+    }
+
+    function deployRedisVersion() {
+        return document.getElementById('deployRedisVersion').value.trim() || '7.2-alpine';
+    }
+
+    function deployNginxVersion() {
+        return document.getElementById('deployNginxVersion').value.trim() || '1.27.3';
+    }
+
+    function saveDeploySetup() {
+        if (!currentConfig) return;
+        const setup = deploySetup();
+        setup.repositories = {
+            platform: {
+                repo: document.getElementById('deployPlatformRepository').value.trim() || 'ceenads/project-iaa-platform',
+                ref: document.getElementById('deployPlatformWorkflowRef').value.trim() || 'master',
+                release_tag: document.getElementById('deployPlatformReleaseTag').value.trim() || 'latest'
+            },
+            service: {
+                repo: document.getElementById('deployServiceRepository').value.trim() || 'ceenads/project-iaa-service',
+                ref: document.getElementById('deployServiceWorkflowRef').value.trim() || 'master',
+                release_tag: document.getElementById('deployServiceReleaseTag').value.trim() || 'latest'
+            }
+        };
+        setup.target_domain = document.getElementById('deployTargetDomain').value || 'all';
+        setup.components = checkedDeployComponents();
+        setup.service_components = {
+            redis: {
+                image_version: deployRedisVersion()
+            },
+            nginx: {
+                image_version: deployNginxVersion()
+            }
+        };
+        delete setup.redis_version;
+        delete setup.nginx_version;
+        setup.token = document.getElementById('deployGithubToken').value.trim();
+        updateEditorConfig();
+    }
+
+    function applyDeploySetup() {
+        const setup = currentConfig?.setup?.deploy || {};
+        const repositories = setup.repositories || {};
+        const platform = repositories.platform || {};
+        const service = repositories.service || {};
+        document.getElementById('deployPlatformRepository').value = platform.repo || document.getElementById('deployPlatformRepository').value || 'ceenads/project-iaa-platform';
+        document.getElementById('deployPlatformWorkflowRef').value = platform.ref || document.getElementById('deployPlatformWorkflowRef').value || 'master';
+        document.getElementById('deployPlatformReleaseTag').value = platform.release_tag || document.getElementById('deployPlatformReleaseTag').value || 'latest';
+        document.getElementById('deployServiceRepository').value = service.repo || document.getElementById('deployServiceRepository').value || 'ceenads/project-iaa-service';
+        document.getElementById('deployServiceWorkflowRef').value = service.ref || document.getElementById('deployServiceWorkflowRef').value || 'master';
+        document.getElementById('deployServiceReleaseTag').value = service.release_tag || document.getElementById('deployServiceReleaseTag').value || 'latest';
+        document.getElementById('deployRedisVersion').value = serviceComponentImageVersion(setup, 'redis', document.getElementById('deployRedisVersion').value || '7.2-alpine');
+        document.getElementById('deployNginxVersion').value = serviceComponentImageVersion(setup, 'nginx', document.getElementById('deployNginxVersion').value || '1.27.3');
+        document.getElementById('deployGithubToken').value = setup.token || '';
+        setCheckedDeployComponents(setup.components);
+        refreshDeployDomainOptions();
+        if (setup.target_domain) {
+            const select = document.getElementById('deployTargetDomain');
+            if (Array.from(select.options).some(option => option.value === setup.target_domain)) {
+                select.value = setup.target_domain;
+            }
+        }
+    }
+
+    function cleanIaaConfigForDispatch() {
+        const clone = JSON.parse(JSON.stringify(currentConfig || {}));
+        if (clone.setup?.deploy?.token) {
+            delete clone.setup.deploy.token;
+        }
+        return clone;
+    }
+
+    function componentString(values) {
+        return values.length === 0 ? '' : values.join(',');
+    }
+
+    function refreshDeployDomainOptions() {
+        const select = document.getElementById('deployTargetDomain');
+        if (!select || !previewEditor) return;
+        const previous = select.value || selectedDomain || currentConfig?.setup?.deploy?.target_domain || 'all';
+        const config = previewEditor.get();
+        const domains = (config.web || []).map(item => item.domain).filter(Boolean);
+        select.innerHTML = '<option value="all">全部域名</option>';
+        domains.forEach(domain => {
+            const option = document.createElement('option');
+            option.value = domain;
+            option.textContent = domain;
+            select.appendChild(option);
+        });
+        if (domains.includes(previous) || previous === 'all') {
+            select.value = previous;
+        } else if (selectedDomain && domains.includes(selectedDomain)) {
+            select.value = selectedDomain;
+        }
+    }
+
+    function openDeployActionsForRepository(inputId, label) {
+        try {
+            const repository = parseRepo(document.getElementById(inputId).value, label);
+            window.open(`https://github.com/${repository.repo}/actions/workflows/deploy.yml`, '_blank');
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    function openPlatformDeployActions() {
+        openDeployActionsForRepository('deployPlatformRepository', 'Platform');
+    }
+
+    function openProducerDeployActions() {
+        openDeployActionsForRepository('deployServiceRepository', 'Service');
+    }
+
+    async function dispatchDeploy({ repo, owner, name }, ref, token, deployConfig) {
+        const repoInfo = { repo, owner, name };
+        const startedAt = new Date();
+        deployLog(`触发部署：${repo} / ${deployConfig.release_tag} / ${deployConfig.components}`);
+        const response = await fetch(`https://api.github.com/repos/${owner}/${name}/actions/workflows/deploy.yml/dispatches`, {
+            method: 'POST',
+            headers: githubHeaders(token, {
+                'Content-Type': 'application/json'
+            }),
+            body: JSON.stringify({
+                ref: ref || 'master',
+                inputs: {
+                    deploy_config: JSON.stringify(deployConfig)
+                }
+            })
+        });
+
+        if (response.status !== 204) {
+            const text = await response.text();
+            throw new Error(`${repo} GitHub API 返回 ${response.status}: ${text}`);
+        }
+        deployLog(`${repo} 部署 workflow 已触发。`);
+        const run = await findWorkflowRun(repoInfo, ref || 'master', token, startedAt);
+        return monitorWorkflowRun(repoInfo, run, token);
+    }
+
+    async function triggerDeployFromPreview() {
+        try {
+            if (activeMainTab === 'config' && !saveCurrentDomainDraft(true)) {
+                showMainTab('config');
+                return;
+            }
+            if (!syncEditorConfig()) {
+                return;
+            }
+            saveDeploySetup();
+            generatePreview();
+            resetDeployLog();
+            deployLog('开始部署...');
+
+            const token = document.getElementById('deployGithubToken').value.trim();
+            if (!token) {
+                throw new Error('请输入 GitHub Token');
+            }
+
+            const selected = checkedDeployComponents();
+            if (selected.length === 0) {
+                throw new Error('请至少选择一个部署组件');
+            }
+
+            const platformComponents = selected.filter(component => ['redis', 'nginx', 'bus-java', 'risk-java', 'bus-web', 'risk-web'].includes(component));
+            const producerComponents = selected.filter(component => component === 'producer');
+            const iaaConfig = cleanIaaConfigForDispatch();
+            const targetDomain = document.getElementById('deployTargetDomain').value || 'all';
+            const serviceComponentVersions = {
+                redis: {
+                    image_version: deployRedisVersion()
+                },
+                nginx: {
+                    image_version: deployNginxVersion()
+                }
+            };
+            const baseConfig = {
+                target_domain: targetDomain,
+                service_components: serviceComponentVersions,
+                iaa_config: iaaConfig
+            };
+
+            const dispatches = [];
+            if (platformComponents.length > 0) {
+                dispatches.push(dispatchDeploy(
+                    parseRepo(document.getElementById('deployPlatformRepository').value, 'Platform'),
+                    document.getElementById('deployPlatformWorkflowRef').value.trim() || 'master',
+                    token,
+                    {
+                        ...baseConfig,
+                        release_tag: document.getElementById('deployPlatformReleaseTag').value.trim() || 'latest',
+                        components: componentString(platformComponents)
+                    }
+                ));
+            }
+            if (producerComponents.length > 0) {
+                dispatches.push(dispatchDeploy(
+                    parseRepo(document.getElementById('deployServiceRepository').value, 'Service'),
+                    document.getElementById('deployServiceWorkflowRef').value.trim() || 'master',
+                    token,
+                    {
+                        ...baseConfig,
+                        release_tag: document.getElementById('deployServiceReleaseTag').value.trim() || 'latest',
+                        components: componentString(producerComponents)
+                    }
+                ));
+            }
+
+            await Promise.all(dispatches);
+            deployLog('部署执行已完成。');
+        } catch (error) {
+            deployLog('失败：' + error.message);
+            alert(error.message);
+        }
+    }
+
+    // 页面加载时初始化
+    window.onload = function() {
+        // 初始化 JSON 编辑器
+        const container = document.getElementById('jsoneditor');
+        const options = {
+            mode: 'code',
+            modes: ['tree', 'code', 'text'],
+            mainMenuBar: false,  // 隐藏顶部工具栏
+            navigationBar: false,  // 隐藏导航栏
+            statusBar: false,  // 隐藏状态栏
+            onError: function (err) {
+                alert('JSON 错误：' + err.toString());
+            }
+        };
+        editor = new JSONEditor(container, options);
+
+        // 设置默认配置
+        const defaultConfig = {
+            "web": []
+        };
+        editor.set(defaultConfig);
+
+        // 初始化预览编辑器（只读模式）
+        const previewContainer = document.getElementById('previewEditor');
+        const previewOptions = {
+            mode: 'code',
+            modes: ['code', 'tree'],
+            mainMenuBar: false,  // 隐藏顶部工具栏
+            navigationBar: false,  // 隐藏导航栏
+            statusBar: false,  // 隐藏状态栏
+            onEditable: function () {
+                return false;  // 设置为只读
+            },
+            onError: function (err) {
+                alert('JSON 错误：' + err.toString());
+            }
+        };
+        previewEditor = new JSONEditor(previewContainer, previewOptions);
+
+        syncEditorConfig();
+        populateDomainList();
+        showMainTab('load');
+
+        const query = new URLSearchParams(window.location.search);
+        const repoFromTemplate = '__REPOSITORY__';
+        const tagFromTemplate = '__RELEASE_TAG__';
+        const repo = query.get('repo') || (repoFromTemplate === '__REPOSITORY__' ? 'ceenads/project-iaa-platform' : repoFromTemplate);
+        const tag = query.get('tag') || (tagFromTemplate === '__RELEASE_TAG__' ? 'latest' : tagFromTemplate);
+        document.getElementById('deployPlatformRepository').value = repo;
+        document.getElementById('deployPlatformReleaseTag').value = tag;
+        document.getElementById('deployServiceRepository').value = query.get('service_repo') || 'ceenads/project-iaa-service';
+        document.getElementById('deployServiceReleaseTag').value = query.get('service_tag') || 'latest';
+        applyDeploySetup();
+    };
+</script>
+</body>
+</html>
