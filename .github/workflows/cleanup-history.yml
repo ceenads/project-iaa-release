@@ -57,14 +57,7 @@ jobs:
             gh api -X DELETE "repos/${REPOSITORY}/actions/runs/${run_id}" || true
           done
 
-          trigger_workflow_name="$(
-            gh api "repos/${REPOSITORY}/actions/runs/${TRIGGER_RUN_ID}" \
-              --jq '.name // ""' 2>/dev/null || true
-          )"
-
-          if [ "$trigger_workflow_name" = "pages-build-deployment" ]; then
-            delete_run_artifacts "${TRIGGER_RUN_ID}" "github-pages"
-          fi
+          delete_run_artifacts "${TRIGGER_RUN_ID}" "github-pages"
 
           mapfile -t cache_ids < <(
             gh api "repos/${REPOSITORY}/actions/caches" --paginate \
