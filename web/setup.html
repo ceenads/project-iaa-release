@@ -278,21 +278,73 @@
             max-height: none !important;
         }
         #connectionTestPanel {
-            border-top: 1px solid #dee2e6;
-            padding: 14px 18px 18px;
+            position: fixed;
+            top: 72px;
+            right: 24px;
+            z-index: 1080;
+            width: min(780px, calc(100vw - 32px));
+            height: min(620px, calc(100vh - 96px));
+            min-height: 260px;
+            border: 1px solid #cfd8e3;
+            border-radius: 8px;
             background: #fff;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.24);
+            overflow: hidden;
+            resize: both;
+            flex-direction: column;
+        }
+        .connection-test-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #dee2e6;
+            background: #f8fafc;
+            cursor: move;
+            user-select: none;
+            touch-action: none;
+        }
+        .connection-test-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .connection-test-body {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1;
+            overflow: hidden;
+            padding: 12px;
         }
         #connectionTestLog {
+            flex: 1;
             background: #111827;
             color: #d1d5db !important;
             border-radius: 8px;
             padding: 12px;
             font-size: 12px;
             line-height: 1.5;
-            min-height: 160px;
-            max-height: 360px;
+            min-height: 0;
             overflow: auto;
             white-space: pre-wrap;
+            word-break: break-word;
+        }
+        @media (max-width: 520px) {
+            #connectionTestPanel {
+                top: 12px !important;
+                left: 12px !important;
+                right: 12px !important;
+                width: auto;
+                height: min(620px, calc(100vh - 24px));
+                resize: none;
+            }
+            .connection-test-header {
+                align-items: flex-start;
+                gap: 10px;
+            }
         }
         @media (max-width: 520px) {
             .service-component-option {
@@ -846,18 +898,21 @@
                             </div>
                         </div>
                     </div>
-                    <div id="connectionTestPanel" style="display: none;">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div id="connectionTestPanel" style="display: none;" role="dialog" aria-labelledby="connectionTestWindowTitle">
+                        <div class="connection-test-header" id="connectionTestDragHandle">
                             <div>
-                                <div class="section-title mb-1">连接测试结果</div>
+                                <div class="section-title mb-1" id="connectionTestWindowTitle">连接测试结果</div>
                                 <div class="text-muted small" id="connectionTestTitle">等待测试...</div>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="connection-test-header-actions">
+                                <span class="badge bg-secondary" id="connectionTestStatus">等待</span>
                                 <a class="btn btn-sm btn-outline-secondary" id="connectionTestRunLink" href="#" target="_blank" rel="noopener" style="display: none;">Run</a>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="hideConnectionTestPanel()">收起</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="hideConnectionTestPanel()">关闭</button>
                             </div>
                         </div>
-                        <pre id="connectionTestLog" class="mb-0 text-muted">等待连接测试...</pre>
+                        <div class="connection-test-body">
+                            <pre id="connectionTestLog" class="mb-0 text-muted">等待连接测试...</pre>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -2108,8 +2163,8 @@
         try {
             await triggerConnectionTest(testConfig);
         } catch (error) {
+            setConnectionTestStatus('失败', 'danger');
             connectionTestLog('失败：' + error.message);
-            alert('❌ 连接测试失败：' + error.message);
         }
     }
 
@@ -2211,8 +2266,11 @@
         await monitorWorkflowRun(platform, run, token, {
             log: connectionTestLog,
             completeLabel: '连接测试结束',
-            failureMessage: '连接测试未成功'
+            failureMessage: '连接测试未成功',
+            logTailLines: 80,
+            pollIntervalMs: 5000
         });
+        setConnectionTestStatus('成功', 'success');
         connectionTestLog('连接测试通过。');
     }
 
@@ -2838,6 +2896,7 @@
     const DEPLOY_RUN_FIND_INTERVAL_MS = 5000;
     const DEPLOY_RUN_POLL_INTERVAL_MS = 8000;
     const deployMonitorState = {};
+    let connectionTestDragReady = false;
 
     function resetDeployLog() {
         const el = document.getElementById('deployResultLog');
@@ -2858,6 +2917,7 @@
         const panel = document.getElementById('connectionTestPanel');
         const title = document.getElementById('connectionTestTitle');
         const link = document.getElementById('connectionTestRunLink');
+        setupConnectionTestWindowDrag();
         if (title) {
             title.textContent = label || '连接测试';
         }
@@ -2865,10 +2925,11 @@
             link.href = '#';
             link.style.display = 'none';
         }
+        setConnectionTestStatus('运行中', 'primary');
         resetConnectionTestLog();
         if (panel) {
-            panel.style.display = 'block';
-            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            panel.style.display = 'flex';
+            ensureConnectionTestWindowInViewport();
         }
     }
 
@@ -2900,6 +2961,110 @@
             link.href = url;
             link.style.display = '';
         }
+    }
+
+    function setConnectionTestStatus(text, tone = 'secondary') {
+        const el = document.getElementById('connectionTestStatus');
+        if (el) {
+            el.textContent = text;
+            el.className = `badge bg-${tone}`;
+        }
+    }
+
+    function clampNumber(value, min, max) {
+        return Math.min(Math.max(value, min), Math.max(min, max));
+    }
+
+    function ensureConnectionTestWindowInViewport() {
+        const panel = document.getElementById('connectionTestPanel');
+        if (!panel || panel.style.display === 'none') {
+            return;
+        }
+
+        const rect = panel.getBoundingClientRect();
+        const margin = 8;
+        const maxLeft = window.innerWidth - rect.width - margin;
+        const maxTop = window.innerHeight - rect.height - margin;
+        let nextLeft = rect.left;
+        let nextTop = rect.top;
+
+        if (rect.left < margin || rect.right > window.innerWidth - margin) {
+            nextLeft = clampNumber(rect.left, margin, maxLeft);
+        }
+        if (rect.top < margin || rect.bottom > window.innerHeight - margin) {
+            nextTop = clampNumber(rect.top, margin, maxTop);
+        }
+
+        if (nextLeft !== rect.left || nextTop !== rect.top) {
+            panel.style.left = `${nextLeft}px`;
+            panel.style.top = `${nextTop}px`;
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+        }
+    }
+
+    function setupConnectionTestWindowDrag() {
+        if (connectionTestDragReady) {
+            return;
+        }
+
+        const panel = document.getElementById('connectionTestPanel');
+        const handle = document.getElementById('connectionTestDragHandle');
+        if (!panel || !handle) {
+            return;
+        }
+
+        connectionTestDragReady = true;
+        let dragging = null;
+
+        const moveWindow = (event) => {
+            if (!dragging || dragging.pointerId !== event.pointerId) {
+                return;
+            }
+
+            const margin = 8;
+            const maxLeft = window.innerWidth - panel.offsetWidth - margin;
+            const maxTop = window.innerHeight - panel.offsetHeight - margin;
+            panel.style.left = `${clampNumber(event.clientX - dragging.offsetX, margin, maxLeft)}px`;
+            panel.style.top = `${clampNumber(event.clientY - dragging.offsetY, margin, maxTop)}px`;
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+        };
+
+        const stopDragging = (event) => {
+            if (!dragging || dragging.pointerId !== event.pointerId) {
+                return;
+            }
+            try {
+                handle.releasePointerCapture(event.pointerId);
+            } catch (_) {
+                // Pointer capture may already be released by the browser.
+            }
+            dragging = null;
+        };
+
+        handle.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0 || event.target.closest('a, button')) {
+                return;
+            }
+
+            const rect = panel.getBoundingClientRect();
+            dragging = {
+                pointerId: event.pointerId,
+                offsetX: event.clientX - rect.left,
+                offsetY: event.clientY - rect.top
+            };
+            panel.style.left = `${rect.left}px`;
+            panel.style.top = `${rect.top}px`;
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+            handle.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        });
+        handle.addEventListener('pointermove', moveWindow);
+        handle.addEventListener('pointerup', stopDragging);
+        handle.addEventListener('pointercancel', stopDragging);
+        window.addEventListener('resize', ensureConnectionTestWindowInViewport);
     }
 
     function sleep(ms) {
@@ -3016,7 +3181,7 @@
             .filter(Boolean);
     }
 
-    async function appendJobLogTail(repoInfo, job, token, state, log = deployLog) {
+    async function appendJobLogTail(repoInfo, job, token, state, log = deployLog, options = {}) {
         if (!['in_progress', 'completed'].includes(job.status)) {
             return;
         }
@@ -3046,7 +3211,9 @@
                 state.finishedLogs[key] = true;
             }
 
-            nextLines.slice(-12).forEach(line => {
+            const lineLimit = options.logTailLines || 12;
+            const linesToLog = lineLimit > 0 ? nextLines.slice(-lineLimit) : nextLines;
+            linesToLog.forEach(line => {
                 log(`${repoInfo.repo} / ${job.name} | ${line.slice(0, 260)}`);
             });
         } catch (error) {
@@ -3061,6 +3228,8 @@
         const log = options.log || deployLog;
         const completeLabel = options.completeLabel || '部署结束';
         const failureMessage = options.failureMessage || '部署未成功';
+        const pollIntervalMs = options.pollIntervalMs || DEPLOY_RUN_POLL_INTERVAL_MS;
+        const logTailLines = options.logTailLines || 12;
         const stateKey = `${repoInfo.repo}:${run.id}`;
         const state = deployMonitorState[stateKey] || {
             jobs: {},
@@ -3099,7 +3268,7 @@
                     }
                 }
 
-                await appendJobLogTail(repoInfo, job, token, state, log);
+                await appendJobLogTail(repoInfo, job, token, state, log, { logTailLines });
             }
 
             if (latestRun.status === 'completed') {
@@ -3111,7 +3280,7 @@
                 return latestRun;
             }
 
-            await sleep(DEPLOY_RUN_POLL_INTERVAL_MS);
+            await sleep(pollIntervalMs);
         }
     }
 
