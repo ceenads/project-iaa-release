@@ -1082,6 +1082,9 @@
         if (!selectedDomain || !document.getElementById('paramsContent')?.children.length) {
             return true;
         }
+        if (strict && !validateAllFields()) {
+            return false;
+        }
         const ok = generateConfigFromForm({ strict });
         if (ok) {
             updateEditorConfig();
@@ -1263,13 +1266,17 @@
 
     // 验证端口号格式
     function validatePort(port) {
-        const portNum = parseInt(port);
+        const text = String(port ?? '').trim();
+        if (!/^\d+$/.test(text)) return false;
+        const portNum = Number(text);
         return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
     }
 
     // 验证 Redis 库序
     function validateRedisRank(rank) {
-        const rankNum = parseInt(rank);
+        const text = String(rank ?? '').trim();
+        if (!/^\d+$/.test(text)) return false;
+        const rankNum = Number(text);
         return !isNaN(rankNum) && rankNum >= 0 && rankNum <= 15;
     }
 
@@ -1427,12 +1434,15 @@
             });
         }
 
-        // 验证缓存服务器
-        if (!document.getElementById('redisPort')?.value.trim() ||
-            !document.getElementById('redisRank')?.value.trim() ||
-            !document.getElementById('redisPassword')?.value.trim()) {
-            isValid = false;
-        }
+        // 验证缓存配置。Redis 密码允许为空，deploy 脚本会按无密码模式启动。
+        ['redisPort', 'redisRank'].forEach(fieldId => {
+            const input = document.getElementById(fieldId);
+            if (input && !input.value.trim()) {
+                input.classList.add('is-invalid');
+                isValid = false;
+                invalidFields.push(fieldId);
+            }
+        });
 
         const redisServers = document.getElementById('redisServers')?.querySelectorAll('.server-row');
         if (redisServers) {
@@ -1980,9 +1990,36 @@
         return hasDatabase ? '数据库服务器' : '服务器';
     }
 
+    function normalizeRepositoryValue(value, fallback) {
+        const text = String(value || '').trim();
+        return text && text !== '__REPOSITORY__' ? text : fallback;
+    }
+
+    function normalizeReleaseTagValue(value, fallback = 'latest') {
+        const text = String(value || '').trim();
+        return text && text !== '__RELEASE_TAG__' ? text : fallback;
+    }
+
     function deployPlatformRepositoryValue() {
-        const value = document.getElementById('deployPlatformRepository')?.value.trim();
-        return value && value !== '__REPOSITORY__' ? value : 'ceenads/project-iaa-platform';
+        return normalizeRepositoryValue(
+            document.getElementById('deployPlatformRepository')?.value,
+            'ceenads/project-iaa-platform'
+        );
+    }
+
+    function deployServiceRepositoryValue() {
+        return normalizeRepositoryValue(
+            document.getElementById('deployServiceRepository')?.value,
+            'ceenads/project-iaa-service'
+        );
+    }
+
+    function deployPlatformReleaseTagValue() {
+        return normalizeReleaseTagValue(document.getElementById('deployPlatformReleaseTag')?.value);
+    }
+
+    function deployServiceReleaseTagValue() {
+        return normalizeReleaseTagValue(document.getElementById('deployServiceReleaseTag')?.value);
     }
 
     function githubTokenValue() {
@@ -2887,6 +2924,129 @@
         return { repo: value, owner: parts[0], name: parts[1] };
     }
 
+    function hasDeployValue(value) {
+        return value !== undefined && value !== null && String(value).trim() !== '';
+    }
+
+    function deployServerList(servers) {
+        return Array.isArray(servers) ? servers : [];
+    }
+
+    function validateDeployPort(value, label, errors) {
+        if (hasDeployValue(value) && !validatePort(value)) {
+            errors.push(`${label} 端口无效：${value}`);
+        }
+    }
+
+    function validateDeployServerList(servers, label, errors) {
+        const list = deployServerList(servers);
+        if (list.length === 0) {
+            errors.push(`${label} 未配置服务器`);
+            return;
+        }
+
+        list.forEach((server, index) => {
+            const name = `${label} 第 ${index + 1} 台`;
+            if (!hasDeployValue(server?.host)) {
+                errors.push(`${name} 缺少公网地址`);
+            }
+            validateDeployPort(server?.port, `${name} SSH`, errors);
+        });
+    }
+
+    function validateDeployEnv(env, requiredKeys, label, errors) {
+        requiredKeys.forEach(key => {
+            if (!hasDeployValue(env?.[key])) {
+                errors.push(`${label} 缺少 ${key}`);
+            }
+        });
+    }
+
+    function selectedDeployDomains(config, targetDomain) {
+        const domains = Array.isArray(config?.web) ? config.web : [];
+        if (targetDomain === 'all') {
+            return domains;
+        }
+        return domains.filter(domain => domain.domain === targetDomain);
+    }
+
+    function validateDeployConfig(targetDomain, components) {
+        const errors = [];
+        const selected = new Set(components);
+        const wants = name => selected.has(name);
+        const domains = selectedDeployDomains(currentConfig, targetDomain);
+
+        if (domains.length === 0) {
+            errors.push(targetDomain === 'all' ? '配置里没有可部署域名' : `未找到部署域名：${targetDomain}`);
+        }
+
+        domains.forEach(domain => {
+            const label = domain.domain || '未命名域名';
+            const system = domain.system || {};
+            const service = system.service || {};
+
+            if (!hasDeployValue(domain.domain)) {
+                errors.push('域名配置缺少 domain');
+            }
+
+            if (wants('redis')) {
+                const redis = service.redis || {};
+                const redisEnv = redis.environment || {};
+                validateDeployServerList(redis.servers, `${label} / Redis`, errors);
+                validateDeployPort(redisEnv.PORT ?? domain.environment?.REDIS_PORT, `${label} / Redis`, errors);
+                if (hasDeployValue(domain.environment?.REDIS_RANK) && !validateRedisRank(domain.environment.REDIS_RANK)) {
+                    errors.push(`${label} / Redis 库序无效：${domain.environment.REDIS_RANK}`);
+                }
+            }
+
+            if (wants('nginx') || wants('bus-web') || wants('risk-web')) {
+                validateDeployServerList(service.nginx?.servers, `${label} / Nginx 网关`, errors);
+            }
+
+            if (wants('bus-web')) {
+                validateDeployPort(system.bus?.web?.nginx?.listen_port, `${label} / 业务前端`, errors);
+            }
+
+            if (wants('risk-web')) {
+                validateDeployPort(system.risk?.web?.nginx?.listen_port, `${label} / 风控前端`, errors);
+            }
+
+            if (wants('bus-java')) {
+                const java = system.bus?.java || {};
+                validateDeployServerList(java.servers, `${label} / 业务后端`, errors);
+                validateDeployEnv(java.environment, ['DB_HOST', 'DB_PORT', 'DB_USER', 'ADMIN_USER'], `${label} / 业务后端`, errors);
+                validateDeployPort(java.environment?.DB_PORT, `${label} / 业务后端数据库`, errors);
+            }
+
+            if (wants('risk-java')) {
+                const java = system.risk?.java || {};
+                validateDeployServerList(java.servers, `${label} / 风控后端`, errors);
+                validateDeployEnv(java.environment, ['DB_HOST', 'DB_PORT', 'DB_USER', 'ADMIN_USER'], `${label} / 风控后端`, errors);
+                validateDeployPort(java.environment?.DB_PORT, `${label} / 风控后端数据库`, errors);
+            }
+
+            if (wants('producer')) {
+                const producer = service.producer || {};
+                validateDeployServerList(producer.servers, `${label} / Producer`, errors);
+                validateDeployEnv(
+                    producer.environment,
+                    ['DB_BUS_HOST', 'DB_BUS_PORT', 'DB_BUS_USER', 'DB_RISK_HOST', 'DB_RISK_PORT', 'DB_RISK_USER', 'GATEWAY_PRIVATE_ADDRESS'],
+                    `${label} / Producer`,
+                    errors
+                );
+                validateDeployPort(producer.environment?.DB_BUS_PORT, `${label} / Producer 业务数据库`, errors);
+                validateDeployPort(producer.environment?.DB_RISK_PORT, `${label} / Producer 风控数据库`, errors);
+            }
+        });
+
+        if (errors.length > 0) {
+            alert('❌ 部署配置不完整：\n\n' + errors.slice(0, 12).join('\n') + (errors.length > 12 ? `\n... 还有 ${errors.length - 12} 项` : ''));
+            return false;
+        }
+
+        return true;
+    }
+
     function checkedDeployComponents() {
         return Array.from(document.querySelectorAll('.deploy-component:checked')).map(input => input.value);
     }
@@ -2915,14 +3075,14 @@
         const setup = deploySetup();
         setup.repositories = {
             platform: {
-                repo: document.getElementById('deployPlatformRepository').value.trim() || 'ceenads/project-iaa-platform',
+                repo: deployPlatformRepositoryValue(),
                 ref: document.getElementById('deployPlatformWorkflowRef').value.trim() || 'master',
-                release_tag: document.getElementById('deployPlatformReleaseTag').value.trim() || 'latest'
+                release_tag: deployPlatformReleaseTagValue()
             },
             service: {
-                repo: document.getElementById('deployServiceRepository').value.trim() || 'ceenads/project-iaa-service',
+                repo: deployServiceRepositoryValue(),
                 ref: document.getElementById('deployServiceWorkflowRef').value.trim() || 'master',
-                release_tag: document.getElementById('deployServiceReleaseTag').value.trim() || 'latest'
+                release_tag: deployServiceReleaseTagValue()
             }
         };
         setup.target_domain = document.getElementById('deployTargetDomain').value || 'all';
@@ -2946,12 +3106,12 @@
         const repositories = setup.repositories || {};
         const platform = repositories.platform || {};
         const service = repositories.service || {};
-        document.getElementById('deployPlatformRepository').value = platform.repo || document.getElementById('deployPlatformRepository').value || 'ceenads/project-iaa-platform';
+        document.getElementById('deployPlatformRepository').value = normalizeRepositoryValue(platform.repo || document.getElementById('deployPlatformRepository').value, 'ceenads/project-iaa-platform');
         document.getElementById('deployPlatformWorkflowRef').value = platform.ref || document.getElementById('deployPlatformWorkflowRef').value || 'master';
-        document.getElementById('deployPlatformReleaseTag').value = platform.release_tag || document.getElementById('deployPlatformReleaseTag').value || 'latest';
-        document.getElementById('deployServiceRepository').value = service.repo || document.getElementById('deployServiceRepository').value || 'ceenads/project-iaa-service';
+        document.getElementById('deployPlatformReleaseTag').value = normalizeReleaseTagValue(platform.release_tag || document.getElementById('deployPlatformReleaseTag').value);
+        document.getElementById('deployServiceRepository').value = normalizeRepositoryValue(service.repo || document.getElementById('deployServiceRepository').value, 'ceenads/project-iaa-service');
         document.getElementById('deployServiceWorkflowRef').value = service.ref || document.getElementById('deployServiceWorkflowRef').value || 'master';
-        document.getElementById('deployServiceReleaseTag').value = service.release_tag || document.getElementById('deployServiceReleaseTag').value || 'latest';
+        document.getElementById('deployServiceReleaseTag').value = normalizeReleaseTagValue(service.release_tag || document.getElementById('deployServiceReleaseTag').value);
         document.getElementById('deployRedisVersion').value = serviceComponentImageVersion(setup, 'redis', document.getElementById('deployRedisVersion').value || '7.2-alpine');
         document.getElementById('deployNginxVersion').value = serviceComponentImageVersion(setup, 'nginx', document.getElementById('deployNginxVersion').value || '1.27.3');
         document.getElementById('deployGithubToken').value = setup.token || '';
@@ -2999,7 +3159,8 @@
 
     function openDeployActionsForRepository(inputId, label) {
         try {
-            const repository = parseRepo(document.getElementById(inputId).value, label);
+            const fallback = label === 'Platform' ? 'ceenads/project-iaa-platform' : 'ceenads/project-iaa-service';
+            const repository = parseRepo(normalizeRepositoryValue(document.getElementById(inputId).value, fallback), label);
             window.open(`https://github.com/${repository.repo}/actions/workflows/deploy.yml`, '_blank');
         } catch (error) {
             alert(error.message);
@@ -3042,7 +3203,7 @@
 
     async function triggerDeployFromPreview() {
         try {
-            if (activeMainTab === 'config' && !saveCurrentDomainDraft(true)) {
+            if (activeMainTab === 'config' && !saveCurrentDomainDraft(false)) {
                 showMainTab('config');
                 return;
             }
@@ -3064,10 +3225,14 @@
                 throw new Error('请至少选择一个部署组件');
             }
 
+            const targetDomain = document.getElementById('deployTargetDomain').value || 'all';
+            if (!validateDeployConfig(targetDomain, selected)) {
+                return;
+            }
+
             const platformComponents = selected.filter(component => ['redis', 'nginx', 'bus-java', 'risk-java', 'bus-web', 'risk-web'].includes(component));
             const producerComponents = selected.filter(component => component === 'producer');
             const iaaConfig = cleanIaaConfigForDispatch();
-            const targetDomain = document.getElementById('deployTargetDomain').value || 'all';
             const serviceComponentVersions = {
                 redis: {
                     image_version: deployRedisVersion()
@@ -3085,24 +3250,24 @@
             const dispatches = [];
             if (platformComponents.length > 0) {
                 dispatches.push(dispatchDeploy(
-                    parseRepo(document.getElementById('deployPlatformRepository').value, 'Platform'),
+                    parseRepo(deployPlatformRepositoryValue(), 'Platform'),
                     document.getElementById('deployPlatformWorkflowRef').value.trim() || 'master',
                     token,
                     {
                         ...baseConfig,
-                        release_tag: document.getElementById('deployPlatformReleaseTag').value.trim() || 'latest',
+                        release_tag: deployPlatformReleaseTagValue(),
                         components: componentString(platformComponents)
                     }
                 ));
             }
             if (producerComponents.length > 0) {
                 dispatches.push(dispatchDeploy(
-                    parseRepo(document.getElementById('deployServiceRepository').value, 'Service'),
+                    parseRepo(deployServiceRepositoryValue(), 'Service'),
                     document.getElementById('deployServiceWorkflowRef').value.trim() || 'master',
                     token,
                     {
                         ...baseConfig,
-                        release_tag: document.getElementById('deployServiceReleaseTag').value.trim() || 'latest',
+                        release_tag: deployServiceReleaseTagValue(),
                         components: componentString(producerComponents)
                     }
                 ));
