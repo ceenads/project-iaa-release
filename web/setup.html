@@ -991,7 +991,7 @@
         return server.private_key ? 'key' : 'password';
     }
 
-    function serverAuthFieldsHtml(prefix, server = {}) {
+    function serverAuthMethodHtml(prefix, server = {}) {
         const method = serverAuthMethod(server);
         return `
             <div class="col-md-4">
@@ -1001,14 +1001,19 @@
                     <option value="key"${method === 'key' ? ' selected' : ''}>私钥</option>
                 </select>
             </div>
-            <div class="col-md-8" id="${prefix}_passwordGroup">
+        `;
+    }
+
+    function serverAuthCredentialHtml(prefix, server = {}) {
+        return `
+            <div class="col-12" id="${prefix}_passwordGroup">
                 <label class="form-label">SSH密码</label>
                 <div class="input-group">
                     <input type="password" class="form-control" id="${prefix}_pass" value="${escapeHtml(server.pass || '')}">
                     <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
                 </div>
             </div>
-            <div class="col-md-8" id="${prefix}_privateKeyGroup" style="display: none;">
+            <div class="col-12" id="${prefix}_privateKeyGroup" style="display: none;">
                 <label class="form-label">SSH私钥</label>
                 <textarea class="form-control" id="${prefix}_privateKey" rows="4" spellcheck="false">${escapeHtml(server.private_key || '')}</textarea>
             </div>
@@ -1656,8 +1661,9 @@
                             <label class="form-label">SSH用户名</label>
                             <input type="text" class="form-control" id="busDb_user" value="root">
                         </div>
+                        ${serverAuthMethodHtml('busDb')}
                     </div>
-                    <div class="row mb-3">${serverAuthFieldsHtml('busDb')}</div>
+                    <div class="row mb-3">${serverAuthCredentialHtml('busDb')}</div>
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">数据库端口</label>
@@ -1705,8 +1711,9 @@
                             <label class="form-label">SSH用户名</label>
                             <input type="text" class="form-control" id="riskDb_user" value="root">
                         </div>
+                        ${serverAuthMethodHtml('riskDb')}
                     </div>
-                    <div class="row mb-3">${serverAuthFieldsHtml('riskDb')}</div>
+                    <div class="row mb-3">${serverAuthCredentialHtml('riskDb')}</div>
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">数据库端口</label>
@@ -1754,8 +1761,9 @@
                             <label class="form-label">SSH用户名</label>
                             <input type="text" class="form-control" id="gateway_user" value="root">
                         </div>
+                        ${serverAuthMethodHtml('gateway')}
                     </div>
-                    <div class="row mb-3">${serverAuthFieldsHtml('gateway')}</div>
+                    <div class="row mb-3">${serverAuthCredentialHtml('gateway')}</div>
                     <div class="row">
                         <div class="col-12 text-end">
                             <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('gateway', false)">🔌 测试连接</button>
@@ -1887,8 +1895,9 @@
                         <label class="form-label">SSH用户名</label>
                         <input type="text" class="form-control" id="service_${id}_user" value="${server?.user || 'root'}">
                     </div>
+                    ${serverAuthMethodHtml(`service_${id}`, server || {})}
                 </div>
-                <div class="row mb-3">${serverAuthFieldsHtml(`service_${id}`, server || {})}</div>
+                <div class="row mb-3">${serverAuthCredentialHtml(`service_${id}`, server || {})}</div>
                 <div class="row">
                     <div class="col-12 text-end">
                         <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('service_${id}', false)">🔌 测试连接</button>
@@ -1932,8 +1941,9 @@
                         <label class="form-label">SSH用户名</label>
                         <input type="text" class="form-control" id="redis_${id}_user" value="${server?.user || 'root'}">
                     </div>
+                    ${serverAuthMethodHtml(`redis_${id}`, server || {})}
                 </div>
-                <div class="row mb-3">${serverAuthFieldsHtml(`redis_${id}`, server || {})}</div>
+                <div class="row mb-3">${serverAuthCredentialHtml(`redis_${id}`, server || {})}</div>
                 <div class="row">
                     <div class="col-12 text-end">
                         <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('redis_${id}', false)">🔌 测试连接</button>
