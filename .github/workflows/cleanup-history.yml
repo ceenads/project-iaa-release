@@ -23,14 +23,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
-          TRIGGER_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           CLEANUP_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
 
           mapfile -t run_ids < <(
             gh api "repos/${REPOSITORY}/actions/runs" --paginate \
-              --jq ".workflow_runs[] | select(.status == \"completed\") | select((.name == env.TRIGGER_WORKFLOW_NAME) or (.name == \"Cleanup History\")) | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
+              --jq ".workflow_runs[] | select(.status == \"completed\") | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
           )
 
           for run_id in "${run_ids[@]}"; do
