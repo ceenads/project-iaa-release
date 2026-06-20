@@ -1,0 +1,46 @@
+name: Cleanup History
+
+on:
+  workflow_run:
+    workflows:
+      - Publish Pages
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup-history:
+    name: Delete historical logs and artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete historical logs and artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          CLEANUP_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t run_ids < <(
+            gh api "repos/${REPOSITORY}/actions/runs" --paginate \
+              --jq ".workflow_runs[] | select(.status == \"completed\") | select(.name == env.TRIGGER_WORKFLOW_NAME) | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
+          )
+
+          for run_id in "${run_ids[@]}"; do
+            mapfile -t artifact_ids < <(
+              gh api "repos/${REPOSITORY}/actions/runs/${run_id}/artifacts" --paginate \
+                --jq ".artifacts[].id"
+            )
+
+            for artifact_id in "${artifact_ids[@]}"; do
+              gh api -X DELETE "repos/${REPOSITORY}/actions/artifacts/${artifact_id}" || true
+            done
+
+            gh api -X DELETE "repos/${REPOSITORY}/actions/runs/${run_id}/logs" || true
+          done
