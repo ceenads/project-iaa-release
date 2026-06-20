@@ -1015,9 +1015,31 @@
             </div>
             <div class="col-12" id="${prefix}_privateKeyGroup" style="display: none;">
                 <label class="form-label">SSH私钥</label>
+                <input type="file" class="form-control mb-2" accept=".pem,.key,.txt,.pub" onchange="readPrivateKeyFile('${prefix}', this)">
                 <textarea class="form-control" id="${prefix}_privateKey" rows="4" spellcheck="false">${escapeHtml(server.private_key || '')}</textarea>
             </div>
         `;
+    }
+
+    function readPrivateKeyFile(prefix, input) {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = event => {
+            const keyInput = document.getElementById(`${prefix}_privateKey`);
+            if (keyInput) {
+                keyInput.value = event.target?.result || '';
+                keyInput.classList.remove('is-invalid');
+                saveCurrentDomainDraft(false);
+            }
+            input.value = '';
+        };
+        reader.onerror = () => {
+            alert('❌ 读取私钥文件失败。');
+            input.value = '';
+        };
+        reader.readAsText(file);
     }
 
     function updateServerAuthFields(prefix) {
