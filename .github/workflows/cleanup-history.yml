@@ -30,7 +30,7 @@ jobs:
 
           mapfile -t run_ids < <(
             gh api "repos/${REPOSITORY}/actions/runs" --paginate \
-              --jq ".workflow_runs[] | select(.status == \"completed\") | select(.name == env.TRIGGER_WORKFLOW_NAME) | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
+              --jq ".workflow_runs[] | select(.status == \"completed\") | select((.name == env.TRIGGER_WORKFLOW_NAME) or (.name == \"Cleanup History\")) | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
           )
 
           for run_id in "${run_ids[@]}"; do
@@ -44,6 +44,7 @@ jobs:
             done
 
             gh api -X DELETE "repos/${REPOSITORY}/actions/runs/${run_id}/logs" || true
+            gh api -X DELETE "repos/${REPOSITORY}/actions/runs/${run_id}" || true
           done
 
           mapfile -t deployment_ids < <(
