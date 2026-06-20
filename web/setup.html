@@ -987,6 +987,84 @@
         }
     }
 
+    function serverAuthMethod(server = {}) {
+        return server.private_key ? 'key' : 'password';
+    }
+
+    function serverAuthFieldsHtml(prefix, server = {}) {
+        const method = serverAuthMethod(server);
+        return `
+            <div class="col-md-4">
+                <label class="form-label">SSH认证</label>
+                <select class="form-select" id="${prefix}_authMethod" onchange="updateServerAuthFields('${prefix}')">
+                    <option value="password"${method === 'password' ? ' selected' : ''}>密码</option>
+                    <option value="key"${method === 'key' ? ' selected' : ''}>私钥</option>
+                </select>
+            </div>
+            <div class="col-md-8" id="${prefix}_passwordGroup">
+                <label class="form-label">SSH密码</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="${prefix}_pass" value="${escapeHtml(server.pass || '')}">
+                    <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
+                </div>
+            </div>
+            <div class="col-md-8" id="${prefix}_privateKeyGroup" style="display: none;">
+                <label class="form-label">SSH私钥</label>
+                <textarea class="form-control" id="${prefix}_privateKey" rows="4" spellcheck="false">${escapeHtml(server.private_key || '')}</textarea>
+            </div>
+        `;
+    }
+
+    function updateServerAuthFields(prefix) {
+        const method = document.getElementById(`${prefix}_authMethod`)?.value || 'password';
+        const passwordGroup = document.getElementById(`${prefix}_passwordGroup`);
+        const privateKeyGroup = document.getElementById(`${prefix}_privateKeyGroup`);
+        if (passwordGroup) {
+            passwordGroup.style.display = method === 'password' ? '' : 'none';
+        }
+        if (privateKeyGroup) {
+            privateKeyGroup.style.display = method === 'key' ? '' : 'none';
+        }
+    }
+
+    function collectServerAuth(prefix) {
+        const method = document.getElementById(`${prefix}_authMethod`)?.value || 'password';
+        const pass = document.getElementById(`${prefix}_pass`)?.value.trim() || '';
+        const privateKey = document.getElementById(`${prefix}_privateKey`)?.value.trim() || '';
+        return method === 'key'
+            ? { private_key: privateKey }
+            : { pass };
+    }
+
+    function fillServerAuth(prefix, server = {}) {
+        const methodEl = document.getElementById(`${prefix}_authMethod`);
+        if (methodEl) {
+            methodEl.value = serverAuthMethod(server);
+        }
+        const passEl = document.getElementById(`${prefix}_pass`);
+        if (passEl) {
+            passEl.value = server.pass || '';
+        }
+        const keyEl = document.getElementById(`${prefix}_privateKey`);
+        if (keyEl) {
+            keyEl.value = server.private_key || '';
+        }
+        updateServerAuthFields(prefix);
+    }
+
+    function validateServerAuth(prefix, invalidFields = []) {
+        const method = document.getElementById(`${prefix}_authMethod`)?.value || 'password';
+        const fieldId = method === 'key' ? `${prefix}_privateKey` : `${prefix}_pass`;
+        const input = document.getElementById(fieldId);
+        if (input && !input.value.trim()) {
+            input.classList.add('is-invalid');
+            invalidFields.push(fieldId);
+            return false;
+        }
+        input?.classList.remove('is-invalid');
+        return true;
+    }
+
     function showMainTab(tab) {
         if (activeMainTab === 'config' && tab !== 'config' && !saveCurrentDomainDraft(false)) {
             return;
@@ -1398,7 +1476,7 @@
 
         // 验证数据库服务器
         ['busDb', 'riskDb'].forEach(prefix => {
-            ['host', 'comm', 'port', 'user', 'pass', 'dbPort', 'dbUser', 'dbPass'].forEach(field => {
+            ['host', 'comm', 'port', 'user', 'dbPort', 'dbUser', 'dbPass'].forEach(field => {
                 const input = document.getElementById(`${prefix}_${field}`);
                 if (input && !input.value.trim()) {
                     input.classList.add('is-invalid');
@@ -1406,10 +1484,13 @@
                     invalidFields.push(`${prefix}_${field}`);
                 }
             });
+            if (!validateServerAuth(prefix, invalidFields)) {
+                isValid = false;
+            }
         });
 
         // 验证网关服务器
-        ['host', 'comm', 'port', 'user', 'pass'].forEach(field => {
+        ['host', 'comm', 'port', 'user'].forEach(field => {
             const input = document.getElementById(`gateway_${field}`);
             if (input && !input.value.trim()) {
                 input.classList.add('is-invalid');
@@ -1417,13 +1498,16 @@
                 invalidFields.push(`gateway_${field}`);
             }
         });
+        if (!validateServerAuth('gateway', invalidFields)) {
+            isValid = false;
+        }
 
         // 验证负载服务器
         const serviceServers = document.getElementById('serviceServers')?.querySelectorAll('.server-row');
         if (serviceServers) {
             serviceServers.forEach(server => {
                 const id = server.id.replace('serviceServer_', '');
-                ['host', 'comm', 'port', 'user', 'pass'].forEach(field => {
+                ['host', 'comm', 'port', 'user'].forEach(field => {
                     const input = document.getElementById(`service_${id}_${field}`);
                     if (input && !input.value.trim()) {
                         input.classList.add('is-invalid');
@@ -1431,6 +1515,9 @@
                         invalidFields.push(`service_${id}_${field}`);
                     }
                 });
+                if (!validateServerAuth(`service_${id}`, invalidFields)) {
+                    isValid = false;
+                }
             });
         }
 
@@ -1448,7 +1535,7 @@
         if (redisServers) {
             redisServers.forEach(server => {
                 const id = server.id.replace('redisServer_', '');
-                ['host', 'comm', 'port', 'user', 'pass'].forEach(field => {
+                ['host', 'comm', 'port', 'user'].forEach(field => {
                     const input = document.getElementById(`redis_${id}_${field}`);
                     if (input && !input.value.trim()) {
                         input.classList.add('is-invalid');
@@ -1456,6 +1543,9 @@
                         invalidFields.push(`redis_${id}_${field}`);
                     }
                 });
+                if (!validateServerAuth(`redis_${id}`, invalidFields)) {
+                    isValid = false;
+                }
             });
         }
 
@@ -1566,14 +1656,8 @@
                             <label class="form-label">SSH用户名</label>
                             <input type="text" class="form-control" id="busDb_user" value="root">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">SSH密码</label>
-                            <div class="input-group">
-                                <input type="password" class="form-control" id="busDb_pass">
-                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
-                            </div>
-                        </div>
                     </div>
+                    <div class="row mb-3">${serverAuthFieldsHtml('busDb')}</div>
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">数据库端口</label>
@@ -1621,14 +1705,8 @@
                             <label class="form-label">SSH用户名</label>
                             <input type="text" class="form-control" id="riskDb_user" value="root">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">SSH密码</label>
-                            <div class="input-group">
-                                <input type="password" class="form-control" id="riskDb_pass">
-                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
-                            </div>
-                        </div>
                     </div>
+                    <div class="row mb-3">${serverAuthFieldsHtml('riskDb')}</div>
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">数据库端口</label>
@@ -1676,14 +1754,8 @@
                             <label class="form-label">SSH用户名</label>
                             <input type="text" class="form-control" id="gateway_user" value="root">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">SSH密码</label>
-                            <div class="input-group">
-                                <input type="password" class="form-control" id="gateway_pass">
-                                <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
-                            </div>
-                        </div>
                     </div>
+                    <div class="row mb-3">${serverAuthFieldsHtml('gateway')}</div>
                     <div class="row">
                         <div class="col-12 text-end">
                             <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('gateway', false)">🔌 测试连接</button>
@@ -1815,14 +1887,8 @@
                         <label class="form-label">SSH用户名</label>
                         <input type="text" class="form-control" id="service_${id}_user" value="${server?.user || 'root'}">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">SSH密码</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="service_${id}_pass" value="${server?.pass || ''}">
-                            <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
-                        </div>
-                    </div>
                 </div>
+                <div class="row mb-3">${serverAuthFieldsHtml(`service_${id}`, server || {})}</div>
                 <div class="row">
                     <div class="col-12 text-end">
                         <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('service_${id}', false)">🔌 测试连接</button>
@@ -1830,6 +1896,7 @@
                 </div>
             `;
         document.getElementById('serviceServers').appendChild(div);
+        updateServerAuthFields(`service_${id}`);
 
         // 添加验证和重复检查
         addServerValidation('service', `serviceServer_${id}`, id);
@@ -1865,14 +1932,8 @@
                         <label class="form-label">SSH用户名</label>
                         <input type="text" class="form-control" id="redis_${id}_user" value="${server?.user || 'root'}">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">SSH密码</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="redis_${id}_pass" value="${server?.pass || ''}">
-                            <button class="btn btn-outline-secondary" type="button" onmousedown="togglePassword(this, true)" onmouseup="togglePassword(this, false)" onmouseleave="togglePassword(this, false)">👁️</button>
-                        </div>
-                    </div>
                 </div>
+                <div class="row mb-3">${serverAuthFieldsHtml(`redis_${id}`, server || {})}</div>
                 <div class="row">
                     <div class="col-12 text-end">
                         <button class="btn btn-sm btn-info" type="button" onclick="testServerConnection('redis_${id}', false)">🔌 测试连接</button>
@@ -1880,6 +1941,7 @@
                 </div>
             `;
         document.getElementById('redisServers').appendChild(div);
+        updateServerAuthFields(`redis_${id}`);
 
         // 添加验证和重复检查
         addServerValidation('redis', `redisServer_${id}`, id);
@@ -1895,11 +1957,15 @@
         const comm = document.getElementById(`${prefix}_comm`)?.value.trim();
         const port = document.getElementById(`${prefix}_port`)?.value.trim() || '22';
         const user = document.getElementById(`${prefix}_user`)?.value.trim() || 'root';
-        const pass = document.getElementById(`${prefix}_pass`)?.value.trim();
+        const auth = collectServerAuth(prefix);
 
         // 验证必填项
         if (!host) {
             alert('❌ 请先填写公网地址！');
+            return;
+        }
+        if (!auth.pass && !auth.private_key) {
+            alert('❌ 请先填写 SSH 密码或 SSH 私钥！');
             return;
         }
 
@@ -1959,7 +2025,13 @@
         const testConfig = {
             kind: hasDatabase ? 'database' : 'server',
             label: connectionTestLabel(prefix, hasDatabase),
-            server: { host, comm, port, user, pass }
+            server: {
+                host,
+                comm,
+                port,
+                user,
+                ...(auth.private_key ? { private_key: auth.private_key } : { pass: auth.pass })
+            }
         };
 
         if (hasDatabase) {
@@ -2151,7 +2223,7 @@
             document.getElementById('busDb_comm').value = busDbServer.comm || '';
             document.getElementById('busDb_port').value = busDbServer.port || '22';
             document.getElementById('busDb_user').value = busDbServer.user || 'root';
-            document.getElementById('busDb_pass').value = busDbServer.pass || '';
+            fillServerAuth('busDb', busDbServer);
         }
         if (busDbConfig) {
             // 从 mysql.config 读取数据库配置信息
@@ -2171,7 +2243,7 @@
             document.getElementById('riskDb_comm').value = riskDbServer.comm || '';
             document.getElementById('riskDb_port').value = riskDbServer.port || '22';
             document.getElementById('riskDb_user').value = riskDbServer.user || 'root';
-            document.getElementById('riskDb_pass').value = riskDbServer.pass || '';
+            fillServerAuth('riskDb', riskDbServer);
         }
         if (riskDbConfig) {
             // 从 mysql.config 读取数据库配置信息
@@ -2187,7 +2259,7 @@
             document.getElementById('gateway_comm').value = gatewayServer.comm || '';
             document.getElementById('gateway_port').value = gatewayServer.port || '22';
             document.getElementById('gateway_user').value = gatewayServer.user || 'root';
-            document.getElementById('gateway_pass').value = gatewayServer.pass || '';
+            fillServerAuth('gateway', gatewayServer);
         }
 
         // 负载服务器
@@ -2241,7 +2313,7 @@
             comm: document.getElementById('busDb_comm').value.trim(),
             port: parseInt(document.getElementById('busDb_port').value.trim()) || 22,
             user: document.getElementById('busDb_user').value.trim() || 'root',
-            pass: document.getElementById('busDb_pass').value.trim()
+            ...collectServerAuth('busDb')
         };
 
         // 收集业务数据库配置
@@ -2258,7 +2330,7 @@
             comm: document.getElementById('riskDb_comm').value.trim(),
             port: parseInt(document.getElementById('riskDb_port').value.trim()) || 22,
             user: document.getElementById('riskDb_user').value.trim() || 'root',
-            pass: document.getElementById('riskDb_pass').value.trim()
+            ...collectServerAuth('riskDb')
         };
 
         // 收集风控数据库配置
@@ -2275,7 +2347,7 @@
             comm: document.getElementById('gateway_comm').value.trim(),
             port: parseInt(document.getElementById('gateway_port').value.trim()) || 22,
             user: document.getElementById('gateway_user').value.trim() || 'root',
-            pass: document.getElementById('gateway_pass').value.trim()
+            ...collectServerAuth('gateway')
         };
 
         // 收集负载服务器配置
@@ -2288,7 +2360,7 @@
                 comm: document.getElementById(`service_${id}_comm`).value.trim(),
                 port: parseInt(document.getElementById(`service_${id}_port`).value.trim()) || 22,
                 user: document.getElementById(`service_${id}_user`).value.trim() || 'root',
-                pass: document.getElementById(`service_${id}_pass`).value.trim()
+                ...collectServerAuth(`service_${id}`)
             };
             if (server.host) {
                 producerServers.push(server);
@@ -2305,7 +2377,7 @@
                 comm: document.getElementById(`redis_${id}_comm`).value.trim(),
                 port: parseInt(document.getElementById(`redis_${id}_port`).value.trim()) || 22,
                 user: document.getElementById(`redis_${id}_user`).value.trim() || 'root',
-                pass: document.getElementById(`redis_${id}_pass`).value.trim()
+                ...collectServerAuth(`redis_${id}`)
             };
             if (server.host) {
                 redisServers.push(server);
@@ -2951,6 +3023,13 @@
                 errors.push(`${name} 缺少公网地址`);
             }
             validateDeployPort(server?.port, `${name} SSH`, errors);
+            const hasPassword = hasDeployValue(server?.pass);
+            const hasPrivateKey = hasDeployValue(server?.private_key);
+            if (!hasPassword && !hasPrivateKey) {
+                errors.push(`${name} 缺少 SSH 密码或 SSH 私钥`);
+            } else if (hasPassword && hasPrivateKey) {
+                errors.push(`${name} SSH 密码和私钥只能选择一种`);
+            }
         });
     }
 
