@@ -2153,7 +2153,7 @@
 
         if (hasDatabase) {
             testConfig.database = {
-                host,
+                host: comm || '127.0.0.1',
                 port: document.getElementById(`${prefix}_dbPort`)?.value.trim(),
                 user: document.getElementById(`${prefix}_dbUser`)?.value.trim() || 'root',
                 pass: document.getElementById(`${prefix}_dbPass`)?.value.trim() || ''
