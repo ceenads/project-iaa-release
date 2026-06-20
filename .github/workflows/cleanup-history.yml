@@ -47,6 +47,15 @@ jobs:
             gh api -X DELETE "repos/${REPOSITORY}/actions/runs/${run_id}" || true
           done
 
+          mapfile -t cache_ids < <(
+            gh api "repos/${REPOSITORY}/actions/caches" --paginate \
+              --jq ".actions_caches[].id"
+          )
+
+          for cache_id in "${cache_ids[@]}"; do
+            gh api -X DELETE "repos/${REPOSITORY}/actions/caches/${cache_id}" || true
+          done
+
           mapfile -t deployment_ids < <(
             gh api "repos/${REPOSITORY}/deployments" --paginate \
               --jq ".[].id"
