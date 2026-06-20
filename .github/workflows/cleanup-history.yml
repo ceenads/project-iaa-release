@@ -10,6 +10,7 @@ on:
 permissions:
   actions: write
   contents: read
+  deployments: write
 
 jobs:
   cleanup-history:
@@ -43,4 +44,20 @@ jobs:
             done
 
             gh api -X DELETE "repos/${REPOSITORY}/actions/runs/${run_id}/logs" || true
+          done
+
+          mapfile -t deployment_ids < <(
+            gh api "repos/${REPOSITORY}/deployments" --paginate \
+              --jq ".[].id"
+          )
+
+          for deployment_id in "${deployment_ids[@]}"; do
+            latest_state="$(
+              gh api "repos/${REPOSITORY}/deployments/${deployment_id}/statuses" \
+                --jq '.[0].state // ""' 2>/dev/null || true
+            )"
+
+            if [ "$latest_state" = "inactive" ]; then
+              gh api -X DELETE "repos/${REPOSITORY}/deployments/${deployment_id}" || true
+            fi
           done
