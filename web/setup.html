@@ -277,6 +277,23 @@
             flex: 1;
             max-height: none !important;
         }
+        #connectionTestPanel {
+            border-top: 1px solid #dee2e6;
+            padding: 14px 18px 18px;
+            background: #fff;
+        }
+        #connectionTestLog {
+            background: #111827;
+            color: #d1d5db !important;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 12px;
+            line-height: 1.5;
+            min-height: 160px;
+            max-height: 360px;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
         @media (max-width: 520px) {
             .service-component-option {
                 grid-template-columns: 1fr;
@@ -828,6 +845,19 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    <div id="connectionTestPanel" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <div class="section-title mb-1">连接测试结果</div>
+                                <div class="text-muted small" id="connectionTestTitle">等待测试...</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a class="btn btn-sm btn-outline-secondary" id="connectionTestRunLink" href="#" target="_blank" rel="noopener" style="display: none;">Run</a>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="hideConnectionTestPanel()">收起</button>
+                            </div>
+                        </div>
+                        <pre id="connectionTestLog" class="mb-0 text-muted">等待连接测试...</pre>
                     </div>
                 </div>
             </section>
@@ -2078,7 +2108,8 @@
         try {
             await triggerConnectionTest(testConfig);
         } catch (error) {
-            alert('❌ 连接测试触发失败：' + error.message);
+            connectionTestLog('失败：' + error.message);
+            alert('❌ 连接测试失败：' + error.message);
         }
     }
 
@@ -2141,6 +2172,10 @@
         const platform = parseRepo(deployPlatformRepositoryValue(), 'Platform');
         const ref = document.getElementById('deployPlatformWorkflowRef')?.value.trim() || 'master';
 
+        showConnectionTestPanel(testConfig.label);
+        connectionTestLog(`触发连接测试：${platform.repo} / ${testConfig.label}`);
+
+        const startedAt = new Date();
         const response = await fetch(`https://api.github.com/repos/${platform.owner}/${platform.name}/actions/workflows/connection-test.yml/dispatches`, {
             method: 'POST',
             headers: {
@@ -2162,8 +2197,23 @@
             throw new Error(`连接测试 workflow 触发失败，GitHub API 返回 ${response.status}: ${text}`);
         }
 
-        window.open(`https://github.com/${platform.repo}/actions/workflows/connection-test.yml`, '_blank');
-        alert(`✅ 连接测试已触发：${testConfig.label}\n\n测试会在 platform 仓库的 Actions 中执行，结果请查看刚打开的 workflow 页面。`);
+        connectionTestLog('连接测试 workflow 已触发，等待 GitHub 创建 run...');
+        const run = await findWorkflowRun(
+            platform,
+            CONNECTION_TEST_WORKFLOW_FILE,
+            ref,
+            token,
+            startedAt,
+            connectionTestLog,
+            'connection-test workflow run'
+        );
+        setConnectionTestRunLink(run.html_url);
+        await monitorWorkflowRun(platform, run, token, {
+            log: connectionTestLog,
+            completeLabel: '连接测试结束',
+            failureMessage: '连接测试未成功'
+        });
+        connectionTestLog('连接测试通过。');
     }
 
     // 删除服务器
@@ -2783,6 +2833,7 @@
     }
 
     const DEPLOY_WORKFLOW_FILE = 'deploy.yml';
+    const CONNECTION_TEST_WORKFLOW_FILE = 'connection-test.yml';
     const DEPLOY_RUN_FIND_TIMEOUT_MS = 90000;
     const DEPLOY_RUN_FIND_INTERVAL_MS = 5000;
     const DEPLOY_RUN_POLL_INTERVAL_MS = 8000;
@@ -2801,6 +2852,54 @@
         const line = '[' + new Date().toLocaleTimeString() + '] ' + message;
         el.textContent = el.textContent === '等待部署...' ? line : el.textContent + '\n' + line;
         el.scrollTop = el.scrollHeight;
+    }
+
+    function showConnectionTestPanel(label) {
+        const panel = document.getElementById('connectionTestPanel');
+        const title = document.getElementById('connectionTestTitle');
+        const link = document.getElementById('connectionTestRunLink');
+        if (title) {
+            title.textContent = label || '连接测试';
+        }
+        if (link) {
+            link.href = '#';
+            link.style.display = 'none';
+        }
+        resetConnectionTestLog();
+        if (panel) {
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    function hideConnectionTestPanel() {
+        const panel = document.getElementById('connectionTestPanel');
+        if (panel) {
+            panel.style.display = 'none';
+        }
+    }
+
+    function resetConnectionTestLog() {
+        const el = document.getElementById('connectionTestLog');
+        if (el) {
+            el.textContent = '等待连接测试...';
+        }
+    }
+
+    function connectionTestLog(message) {
+        const el = document.getElementById('connectionTestLog');
+        if (!el) return;
+        const line = '[' + new Date().toLocaleTimeString() + '] ' + message;
+        el.textContent = el.textContent === '等待连接测试...' ? line : el.textContent + '\n' + line;
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function setConnectionTestRunLink(url) {
+        const link = document.getElementById('connectionTestRunLink');
+        if (link && url) {
+            link.href = url;
+            link.style.display = '';
+        }
     }
 
     function sleep(ms) {
@@ -2881,13 +2980,13 @@
         return true;
     }
 
-    async function findWorkflowRun(repoInfo, ref, token, startedAt) {
+    async function findWorkflowRun(repoInfo, workflowFile, ref, token, startedAt, log = deployLog, label = 'workflow run') {
         const deadline = Date.now() + DEPLOY_RUN_FIND_TIMEOUT_MS;
         const earliest = new Date(startedAt.getTime() - 15000);
         let waitingLoggedAt = 0;
 
         while (Date.now() < deadline) {
-            const data = await githubJson(workflowRunsUrl(repoInfo, DEPLOY_WORKFLOW_FILE, ref), token);
+            const data = await githubJson(workflowRunsUrl(repoInfo, workflowFile, ref), token);
             const runs = (data.workflow_runs || [])
                 .filter(run => new Date(run.created_at) >= earliest)
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -2897,13 +2996,13 @@
             }
 
             if (Date.now() - waitingLoggedAt > 12000) {
-                deployLog(`${repoInfo.repo} 等待 GitHub 创建 workflow run...`);
+                log(`${repoInfo.repo} 等待 GitHub 创建 ${label}...`);
                 waitingLoggedAt = Date.now();
             }
             await sleep(DEPLOY_RUN_FIND_INTERVAL_MS);
         }
 
-        throw new Error(`${repoInfo.repo} 未找到刚触发的 deploy workflow run，请打开 Actions 确认是否已启动`);
+        throw new Error(`${repoInfo.repo} 未找到刚触发的 ${label}，请点击 Run 或打开 Actions 确认是否已启动`);
     }
 
     function normalizeJobLog(text) {
@@ -2917,7 +3016,7 @@
             .filter(Boolean);
     }
 
-    async function appendJobLogTail(repoInfo, job, token, state) {
+    async function appendJobLogTail(repoInfo, job, token, state, log = deployLog) {
         if (!['in_progress', 'completed'].includes(job.status)) {
             return;
         }
@@ -2948,17 +3047,20 @@
             }
 
             nextLines.slice(-12).forEach(line => {
-                deployLog(`${repoInfo.repo} / ${job.name} | ${line.slice(0, 260)}`);
+                log(`${repoInfo.repo} / ${job.name} | ${line.slice(0, 260)}`);
             });
         } catch (error) {
             if (!state.logReadErrors[key]) {
                 state.logReadErrors[key] = true;
-                deployLog(`${repoInfo.repo} / ${job.name} 原始日志无法直接读取：${error.message}，可点击 Run 链接查看完整日志。`);
+                log(`${repoInfo.repo} / ${job.name} 原始日志无法直接读取：${error.message}，可点击 Run 链接查看完整日志。`);
             }
         }
     }
 
-    async function monitorWorkflowRun(repoInfo, run, token) {
+    async function monitorWorkflowRun(repoInfo, run, token, options = {}) {
+        const log = options.log || deployLog;
+        const completeLabel = options.completeLabel || '部署结束';
+        const failureMessage = options.failureMessage || '部署未成功';
         const stateKey = `${repoInfo.repo}:${run.id}`;
         const state = deployMonitorState[stateKey] || {
             jobs: {},
@@ -2969,13 +3071,13 @@
         };
         deployMonitorState[stateKey] = state;
 
-        deployLog(`${repoInfo.repo} Run #${run.run_number}: ${run.html_url}`);
+        log(`${repoInfo.repo} Run #${run.run_number}: ${run.html_url}`);
 
         while (true) {
             const latestRun = await githubJson(workflowRunUrl(repoInfo, run.id), token);
             const runStatus = `${latestRun.status}:${latestRun.conclusion || ''}`;
             if (changedDeployState(state, 'runStatus', runStatus)) {
-                deployLog(`${repoInfo.repo} Run 状态：${statusLabel(latestRun.status, latestRun.conclusion)}`);
+                log(`${repoInfo.repo} Run 状态：${statusLabel(latestRun.status, latestRun.conclusion)}`);
             }
 
             const jobsPayload = await githubJson(workflowJobsUrl(repoInfo, run.id), token);
@@ -2985,7 +3087,7 @@
                 const jobStatus = `${job.status}:${job.conclusion || ''}`;
                 if (state.jobs[job.id] !== jobStatus) {
                     state.jobs[job.id] = jobStatus;
-                    deployLog(`${repoInfo.repo} Job ${job.name}：${statusLabel(job.status, job.conclusion)}`);
+                    log(`${repoInfo.repo} Job ${job.name}：${statusLabel(job.status, job.conclusion)}`);
                 }
 
                 for (const step of job.steps || []) {
@@ -2993,18 +3095,18 @@
                     const stepStatus = `${step.status}:${step.conclusion || ''}`;
                     if (state.steps[stepKey] !== stepStatus) {
                         state.steps[stepKey] = stepStatus;
-                        deployLog(`${repoInfo.repo} Step ${job.name} / ${step.name}：${statusLabel(step.status, step.conclusion)}`);
+                        log(`${repoInfo.repo} Step ${job.name} / ${step.name}：${statusLabel(step.status, step.conclusion)}`);
                     }
                 }
 
-                await appendJobLogTail(repoInfo, job, token, state);
+                await appendJobLogTail(repoInfo, job, token, state, log);
             }
 
             if (latestRun.status === 'completed') {
                 const finalStatus = statusLabel(latestRun.status, latestRun.conclusion);
-                deployLog(`${repoInfo.repo} 部署结束：${finalStatus}`);
+                log(`${repoInfo.repo} ${completeLabel}：${finalStatus}`);
                 if (latestRun.conclusion !== 'success') {
-                    throw new Error(`${repoInfo.repo} 部署未成功：${finalStatus}`);
+                    throw new Error(`${repoInfo.repo} ${failureMessage}：${finalStatus}`);
                 }
                 return latestRun;
             }
@@ -3308,7 +3410,7 @@
             throw new Error(`${repo} GitHub API 返回 ${response.status}: ${text}`);
         }
         deployLog(`${repo} 部署 workflow 已触发。`);
-        const run = await findWorkflowRun(repoInfo, ref || 'master', token, startedAt);
+        const run = await findWorkflowRun(repoInfo, DEPLOY_WORKFLOW_FILE, ref || 'master', token, startedAt, deployLog, 'deploy workflow run');
         return monitorWorkflowRun(repoInfo, run, token);
     }
 
