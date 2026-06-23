@@ -1001,6 +1001,20 @@
                         <div class="section-title">组件</div>
                         <div class="artifact-grid mb-3">
                             <div class="service-component-option">
+                                <label class="service-component-check"><input class="form-check-input me-2 deploy-component" type="checkbox" value="mysql" checked> MySQL</label>
+                                <div class="service-component-version">
+                                    <label class="form-label" for="deployMysqlVersion">镜像版本</label>
+                                    <input type="text" class="form-control" id="deployMysqlVersion" value="8.0">
+                                </div>
+                            </div>
+                            <div class="service-component-option">
+                                <label class="service-component-check"><input class="form-check-input me-2 deploy-component" type="checkbox" value="db-migrate" checked> 数据库迁移</label>
+                                <div class="service-component-version">
+                                    <label class="form-label" for="deployFlywayVersion">Flyway版本</label>
+                                    <input type="text" class="form-control" id="deployFlywayVersion" value="10">
+                                </div>
+                            </div>
+                            <div class="service-component-option">
                                 <label class="service-component-check"><input class="form-check-input me-2 deploy-component" type="checkbox" value="redis" checked> Redis</label>
                                 <div class="service-component-version">
                                     <label class="form-label" for="deployRedisVersion">镜像版本</label>
@@ -2458,6 +2472,7 @@
 
         // 收集业务数据库配置
         const busDbConfig = {
+            database: 'bus',
             port: parseInt(document.getElementById('busDb_dbPort').value.trim()),
             username: document.getElementById('busDb_dbUser').value.trim(),
             password: document.getElementById('busDb_dbPass').value.trim()
@@ -2475,6 +2490,7 @@
 
         // 收集风控数据库配置
         const riskDbConfig = {
+            database: 'risk',
             port: parseInt(document.getElementById('riskDb_dbPort').value.trim()),
             username: document.getElementById('riskDb_dbUser').value.trim(),
             password: document.getElementById('riskDb_dbPass').value.trim()
@@ -3381,6 +3397,17 @@
                 }
             }
 
+            if (wants('mysql') || wants('db-migrate')) {
+                const busMysql = system.bus?.mysql || {};
+                const riskMysql = system.risk?.mysql || {};
+                validateDeployServerList(busMysql.servers, `${label} / 业务 MySQL`, errors);
+                validateDeployServerList(riskMysql.servers, `${label} / 风控 MySQL`, errors);
+                validateDeployPort(busMysql.config?.port, `${label} / 业务 MySQL`, errors);
+                validateDeployPort(riskMysql.config?.port, `${label} / 风控 MySQL`, errors);
+                validateDeployEnv(busMysql.config, ['username', 'password'], `${label} / 业务 MySQL`, errors);
+                validateDeployEnv(riskMysql.config, ['username', 'password'], `${label} / 风控 MySQL`, errors);
+            }
+
             if (wants('nginx') || wants('bus-web') || wants('risk-web')) {
                 validateDeployServerList(service.nginx?.servers, `${label} / Nginx 网关`, errors);
             }
@@ -3444,6 +3471,14 @@
         return setup.service_components?.[name]?.image_version || setup[`${name}_version`] || fallback;
     }
 
+    function deployMysqlVersion() {
+        return document.getElementById('deployMysqlVersion').value.trim() || '8.0';
+    }
+
+    function deployFlywayVersion() {
+        return document.getElementById('deployFlywayVersion').value.trim() || '10';
+    }
+
     function deployRedisVersion() {
         return document.getElementById('deployRedisVersion').value.trim() || '7.2-alpine';
     }
@@ -3470,6 +3505,12 @@
         setup.target_domain = document.getElementById('deployTargetDomain').value || 'all';
         setup.components = checkedDeployComponents();
         setup.service_components = {
+            mysql: {
+                image_version: deployMysqlVersion()
+            },
+            flyway: {
+                image_version: deployFlywayVersion()
+            },
             redis: {
                 image_version: deployRedisVersion()
             },
@@ -3477,6 +3518,8 @@
                 image_version: deployNginxVersion()
             }
         };
+        delete setup.mysql_version;
+        delete setup.flyway_version;
         delete setup.redis_version;
         delete setup.nginx_version;
         setup.token = document.getElementById('deployGithubToken').value.trim();
@@ -3494,6 +3537,8 @@
         document.getElementById('deployServiceRepository').value = normalizeRepositoryValue(service.repo || document.getElementById('deployServiceRepository').value, 'ceenads/project-iaa-service');
         document.getElementById('deployServiceWorkflowRef').value = service.ref || document.getElementById('deployServiceWorkflowRef').value || 'master';
         document.getElementById('deployServiceReleaseTag').value = normalizeReleaseTagValue(service.release_tag || document.getElementById('deployServiceReleaseTag').value);
+        document.getElementById('deployMysqlVersion').value = serviceComponentImageVersion(setup, 'mysql', document.getElementById('deployMysqlVersion').value || '8.0');
+        document.getElementById('deployFlywayVersion').value = serviceComponentImageVersion(setup, 'flyway', document.getElementById('deployFlywayVersion').value || '10');
         document.getElementById('deployRedisVersion').value = serviceComponentImageVersion(setup, 'redis', document.getElementById('deployRedisVersion').value || '7.2-alpine');
         document.getElementById('deployNginxVersion').value = serviceComponentImageVersion(setup, 'nginx', document.getElementById('deployNginxVersion').value || '1.27.3');
         document.getElementById('deployGithubToken').value = setup.token || '';
@@ -3612,10 +3657,16 @@
                 return;
             }
 
-            const platformComponents = selected.filter(component => ['redis', 'nginx', 'bus-java', 'risk-java', 'bus-web', 'risk-web'].includes(component));
+            const platformComponents = selected.filter(component => ['mysql', 'db-migrate', 'redis', 'nginx', 'bus-java', 'risk-java', 'bus-web', 'risk-web'].includes(component));
             const producerComponents = selected.filter(component => component === 'producer');
             const iaaConfig = cleanIaaConfigForDispatch();
             const serviceComponentVersions = {
+                mysql: {
+                    image_version: deployMysqlVersion()
+                },
+                flyway: {
+                    image_version: deployFlywayVersion()
+                },
                 redis: {
                     image_version: deployRedisVersion()
                 },
@@ -3629,9 +3680,8 @@
                 iaa_config: iaaConfig
             };
 
-            const dispatches = [];
             if (platformComponents.length > 0) {
-                dispatches.push(dispatchDeploy(
+                await dispatchDeploy(
                     parseRepo(deployPlatformRepositoryValue(), 'Platform'),
                     document.getElementById('deployPlatformWorkflowRef').value.trim() || 'master',
                     token,
@@ -3640,10 +3690,10 @@
                         release_tag: deployPlatformReleaseTagValue(),
                         components: componentString(platformComponents)
                     }
-                ));
+                );
             }
             if (producerComponents.length > 0) {
-                dispatches.push(dispatchDeploy(
+                await dispatchDeploy(
                     parseRepo(deployServiceRepositoryValue(), 'Service'),
                     document.getElementById('deployServiceWorkflowRef').value.trim() || 'master',
                     token,
@@ -3652,10 +3702,8 @@
                         release_tag: deployServiceReleaseTagValue(),
                         components: componentString(producerComponents)
                     }
-                ));
+                );
             }
-
-            await Promise.all(dispatches);
             deployLog('部署执行已完成。');
         } catch (error) {
             deployLog('失败：' + error.message);
