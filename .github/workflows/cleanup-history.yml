@@ -25,6 +25,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           CLEANUP_RUN_ID: ${{ github.run_id }}
+          KEEP_RUNS: 2
         run: |
           set -euo pipefail
 
@@ -47,8 +48,8 @@ jobs:
           }
 
           mapfile -t run_ids < <(
-            gh api "repos/${REPOSITORY}/actions/runs" --paginate \
-              --jq ".workflow_runs[] | select(.status == \"completed\") | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
+            gh api "repos/${REPOSITORY}/actions/runs?per_page=100" \
+              --jq ".workflow_runs | sort_by(.created_at) | reverse | .[${KEEP_RUNS}:] | .[] | select(.status == \"completed\") | select(.id != ${TRIGGER_RUN_ID}) | select(.id != ${CLEANUP_RUN_ID}) | .id"
           )
 
           for run_id in "${run_ids[@]}"; do
