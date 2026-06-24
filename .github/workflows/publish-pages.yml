@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - 'web/setup.html'
+      - 'setup/index.html'
       - '.github/workflows/publish-pages.yml'
   workflow_dispatch:
 
@@ -30,14 +30,14 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$worktree" origin/gh-pages
 
-          mkdir -p "$worktree/web"
-          cp web/setup.html "$worktree/web/setup.html"
+          mkdir -p "$worktree/setup"
+          cp setup/index.html "$worktree/setup/index.html"
           touch "$worktree/.nojekyll"
 
           cd "$worktree"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -r --ignore-unmatch project-iaa-platform
-          git add .nojekyll web/setup.html
+          git rm -r --ignore-unmatch project-iaa-platform web
+          git add .nojekyll setup/index.html
           git commit -m "Publish setup page" || exit 0
           git push origin HEAD:gh-pages

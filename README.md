@@ -2,4 +2,4 @@
 
 Public release assets for ceenads projects.
 
-Setup page: https://ceenads.github.io/project-iaa-release/web/setup.html
+Setup page: https://ceenads.github.io/project-iaa-release/setup/
