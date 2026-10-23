@@ -2596,9 +2596,7 @@
                             path: "/data/service/nginx"
                         },
                         servers: [gatewayServer],
-                        volumes: [
-                            volumesTemplate("/data/scripts", "/usr/share/nginx/upload", "//iaa.ceenmobi.com/scripts")
-                        ]
+                        volumes: []
                     },
                     redis: {
                         environment: {
@@ -2624,7 +2622,6 @@
                         volumes: [
                             volumesTemplate("/data/android", "/data/android", "//iaa.ceenmobi.com/android"),
                             volumesTemplate("/data/dbfiles", "/data/dbfiles", "//iaa.ceenmobi.com/dbfiles"),
-                            volumesTemplate("/data/scripts", "/data/scripts", "//iaa.ceenmobi.com/scripts"),
                             volumesTemplate("/data/webview", "/data/webview", "//iaa.ceenmobi.com/webview")
                         ]
                     }
@@ -2645,7 +2642,6 @@
                         volumes: [
                             volumesTemplate("/data/android", "/data/android", "//iaa.ceenmobi.com/android"),
                             volumesTemplate("/data/dbfiles", "/data/dbfiles", "//iaa.ceenmobi.com/dbfiles"),
-                            volumesTemplate("/data/scripts", "/data/scripts", "//iaa.ceenmobi.com/scripts"),
                             volumesTemplate("/data/webview", "/data/webview", "//iaa.ceenmobi.com/webview")
                         ]
                     },
@@ -2674,7 +2670,6 @@
                         volumes: [
                             volumesTemplate("/data/android", "/data/android", "//iaa.ceenmobi.com/android"),
                             volumesTemplate("/data/dbfiles", "/data/dbfiles", "//iaa.ceenmobi.com/dbfiles"),
-                            volumesTemplate("/data/scripts", "/data/scripts", "//iaa.ceenmobi.com/scripts"),
                             volumesTemplate("/data/webview", "/data/webview", "//iaa.ceenmobi.com/webview")
                         ]
                     },
